@@ -1,0 +1,2389 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "envup",
+    "languages": [
+      "shell",
+      "lua",
+      "markdown",
+      "json",
+      "yaml"
+    ],
+    "frameworks": [
+      "Oh My Zsh",
+      "Powerlevel10k",
+      "NvChad",
+      "lazy.nvim",
+      "TPM",
+      "bats",
+      "GitHub Actions",
+      "ShellCheck"
+    ],
+    "description": "跨平台 dotfiles / 开发环境管理器：一条命令装好 shell、编辑器与 CLI 工具。经开源化重构后加入了测试(bats)、CI、shellcheck 门禁、版本/发布机制、status --json、envup doctor、镜像开关与社区文档。",
+    "analyzedAt": "2026-07-01T09:12:04.957Z",
+    "gitCommitHash": "d084a5f2f98a76266763fd9810a2674fe222263b"
+  },
+  "nodes": [
+    {
+      "id": "document:.github/ISSUE_TEMPLATE/bug_report.md",
+      "type": "document",
+      "name": "bug 模板",
+      "filePath": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "summary": "Bug 报告模板。",
+      "tags": [
+        "community"
+      ]
+    },
+    {
+      "id": "config:.github/ISSUE_TEMPLATE/config.yml",
+      "type": "config",
+      "name": "issue 配置",
+      "filePath": ".github/ISSUE_TEMPLATE/config.yml",
+      "summary": "issue 模板开关。",
+      "tags": [
+        "community",
+        "config"
+      ]
+    },
+    {
+      "id": "document:.github/ISSUE_TEMPLATE/feature_request.md",
+      "type": "document",
+      "name": "feature 模板",
+      "filePath": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "summary": "功能建议模板。",
+      "tags": [
+        "community"
+      ]
+    },
+    {
+      "id": "document:.github/PULL_REQUEST_TEMPLATE.md",
+      "type": "document",
+      "name": "PR 模板",
+      "filePath": ".github/PULL_REQUEST_TEMPLATE.md",
+      "summary": "PR 检查清单（lint/test/doctor/保证/文档）。",
+      "tags": [
+        "community"
+      ]
+    },
+    {
+      "id": "pipeline:.github/workflows/ci.yml",
+      "type": "pipeline",
+      "name": "ci.yml",
+      "filePath": ".github/workflows/ci.yml",
+      "summary": "CI 矩阵：lint / unit / integration / smoke(ubuntu+macos) / smoke-containers(fedora/arch/alpine)。",
+      "tags": [
+        "ci",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "config:.gitmodules",
+      "type": "config",
+      "name": ".gitmodules",
+      "filePath": ".gitmodules",
+      "summary": "7 个子模块：p10k/zsh 插件 + tpm/tmux 插件。",
+      "tags": [
+        "git",
+        "submodule"
+      ]
+    },
+    {
+      "id": "config:.shellcheckrc",
+      "type": "config",
+      "name": ".shellcheckrc",
+      "filePath": ".shellcheckrc",
+      "summary": "shellcheck 配置：SCRIPTDIR 源路径、external-sources、禁用 SC1090/1091。",
+      "tags": [
+        "lint",
+        "config"
+      ]
+    },
+    {
+      "id": "document:CHANGELOG.md",
+      "type": "document",
+      "name": "CHANGELOG",
+      "filePath": "CHANGELOG.md",
+      "summary": "Keep a Changelog：Unreleased + 0.1.0。",
+      "tags": [
+        "docs"
+      ]
+    },
+    {
+      "id": "document:CODE_OF_CONDUCT.md",
+      "type": "document",
+      "name": "CODE_OF_CONDUCT",
+      "filePath": "CODE_OF_CONDUCT.md",
+      "summary": "Contributor Covenant 2.1。",
+      "tags": [
+        "docs",
+        "community"
+      ]
+    },
+    {
+      "id": "file:completions/_envup",
+      "type": "file",
+      "name": "_envup",
+      "filePath": "completions/_envup",
+      "summary": "zsh 补全：子命令 + 动态列出模块/profile。",
+      "tags": [
+        "completion",
+        "zsh"
+      ]
+    },
+    {
+      "id": "document:CONTRIBUTING.md",
+      "type": "document",
+      "name": "CONTRIBUTING",
+      "filePath": "CONTRIBUTING.md",
+      "summary": "贡献指南：加模块、helper 速查、测试&lint、Releasing、模块文档约定。",
+      "tags": [
+        "docs"
+      ]
+    },
+    {
+      "id": "document:docs/ARCHITECTURE.md",
+      "type": "document",
+      "name": "ARCHITECTURE",
+      "filePath": "docs/ARCHITECTURE.md",
+      "summary": "架构、六项保证、平台探测规则、镜像、doctor、lib 分区。",
+      "tags": [
+        "docs",
+        "architecture"
+      ]
+    },
+    {
+      "id": "document:docs/REFACTOR_BASELINE.md",
+      "type": "document",
+      "name": "REFACTOR_BASELINE",
+      "filePath": "docs/REFACTOR_BASELINE.md",
+      "summary": "冻结问题清单（P0-P2+N-1，全部已解决）。",
+      "tags": [
+        "docs",
+        "refactor"
+      ]
+    },
+    {
+      "id": "document:docs/REFACTOR_PLAN.md",
+      "type": "document",
+      "name": "REFACTOR_PLAN",
+      "filePath": "docs/REFACTOR_PLAN.md",
+      "summary": "重构计划书（调研+5 阶段+WI 索引）。",
+      "tags": [
+        "docs",
+        "refactor"
+      ]
+    },
+    {
+      "id": "document:docs/REFACTOR_REPORT.md",
+      "type": "document",
+      "name": "REFACTOR_REPORT",
+      "filePath": "docs/REFACTOR_REPORT.md",
+      "summary": "结项评估：门禁/不变量/回归/评分。",
+      "tags": [
+        "docs",
+        "refactor"
+      ]
+    },
+    {
+      "id": "file:envup",
+      "type": "file",
+      "name": "envup",
+      "filePath": "envup",
+      "summary": "主 CLI：macOS bash<4 自动 re-exec、source lib.sh，分发 install/uninstall/upgrade/status/clean/log/doctor/--version。",
+      "tags": [
+        "cli",
+        "entrypoint"
+      ]
+    },
+    {
+      "id": "file:lib.sh",
+      "type": "file",
+      "name": "lib.sh",
+      "filePath": "lib.sh",
+      "summary": "共享库：日志(带级别)、跨平台包管理、带备份软链、标记块、网络超时、gh_url 镜像、子模块校验、manifest(带 schema)、模块/profile 发现与组合。",
+      "tags": [
+        "core",
+        "library"
+      ]
+    },
+    {
+      "id": "file:modules/atuin/install.sh",
+      "type": "file",
+      "name": "atuin/install.sh",
+      "filePath": "modules/atuin/install.sh",
+      "summary": "atuin 模块（SQLite shell 历史(Ctrl+R)）的 install 钩子。",
+      "tags": [
+        "module",
+        "atuin"
+      ]
+    },
+    {
+      "id": "file:modules/atuin/meta.sh",
+      "type": "file",
+      "name": "atuin/meta.sh",
+      "filePath": "modules/atuin/meta.sh",
+      "summary": "atuin 模块（SQLite shell 历史(Ctrl+R)）的 meta 元数据。",
+      "tags": [
+        "module",
+        "atuin"
+      ]
+    },
+    {
+      "id": "file:modules/atuin/uninstall.sh",
+      "type": "file",
+      "name": "atuin/uninstall.sh",
+      "filePath": "modules/atuin/uninstall.sh",
+      "summary": "atuin 模块（SQLite shell 历史(Ctrl+R)）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "atuin"
+      ]
+    },
+    {
+      "id": "file:modules/fzf/install.sh",
+      "type": "file",
+      "name": "fzf/install.sh",
+      "filePath": "modules/fzf/install.sh",
+      "summary": "fzf 模块（模糊查找器）的 install 钩子。",
+      "tags": [
+        "module",
+        "fzf"
+      ]
+    },
+    {
+      "id": "file:modules/fzf/meta.sh",
+      "type": "file",
+      "name": "fzf/meta.sh",
+      "filePath": "modules/fzf/meta.sh",
+      "summary": "fzf 模块（模糊查找器）的 meta 元数据。",
+      "tags": [
+        "module",
+        "fzf"
+      ]
+    },
+    {
+      "id": "file:modules/fzf/uninstall.sh",
+      "type": "file",
+      "name": "fzf/uninstall.sh",
+      "filePath": "modules/fzf/uninstall.sh",
+      "summary": "fzf 模块（模糊查找器）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "fzf"
+      ]
+    },
+    {
+      "id": "config:modules/git/files/.gitconfig",
+      "type": "config",
+      "name": ".gitconfig",
+      "filePath": "modules/git/files/.gitconfig",
+      "summary": "共享 git 配置；身份在 ~/.gitconfig.local。",
+      "tags": [
+        "git",
+        "config"
+      ]
+    },
+    {
+      "id": "file:modules/git/install.sh",
+      "type": "file",
+      "name": "git/install.sh",
+      "filePath": "modules/git/install.sh",
+      "summary": "git 模块（git 配置）的 install 钩子。",
+      "tags": [
+        "module",
+        "git"
+      ]
+    },
+    {
+      "id": "file:modules/git/meta.sh",
+      "type": "file",
+      "name": "git/meta.sh",
+      "filePath": "modules/git/meta.sh",
+      "summary": "git 模块（git 配置）的 meta 元数据。",
+      "tags": [
+        "module",
+        "git"
+      ]
+    },
+    {
+      "id": "file:modules/git/uninstall.sh",
+      "type": "file",
+      "name": "git/uninstall.sh",
+      "filePath": "modules/git/uninstall.sh",
+      "summary": "git 模块（git 配置）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "git"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/init.lua",
+      "type": "file",
+      "name": "init.lua",
+      "filePath": "modules/nvim/files/init.lua",
+      "summary": "nvim 入口：自举 lazy(支持 ENVUP_GH_MIRROR)、加载 NvChad/插件/options/mappings。",
+      "tags": [
+        "nvim",
+        "entrypoint"
+      ]
+    },
+    {
+      "id": "config:modules/nvim/files/lazy-lock.json",
+      "type": "config",
+      "name": "lazy-lock.json",
+      "filePath": "modules/nvim/files/lazy-lock.json",
+      "summary": "lazy.nvim 插件锁定（钉 commit）。",
+      "tags": [
+        "nvim",
+        "lockfile"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/autocmds.lua",
+      "type": "file",
+      "name": "autocmds.lua",
+      "filePath": "modules/nvim/files/lua/autocmds.lua",
+      "summary": "nvim Lua 配置：autocmds。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/chadrc.lua",
+      "type": "file",
+      "name": "chadrc.lua",
+      "filePath": "modules/nvim/files/lua/chadrc.lua",
+      "summary": "nvim Lua 配置：chadrc。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/configs/conform.lua",
+      "type": "file",
+      "name": "conform.lua",
+      "filePath": "modules/nvim/files/lua/configs/conform.lua",
+      "summary": "nvim Lua 配置：conform。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/configs/lazy.lua",
+      "type": "file",
+      "name": "lazy.lua",
+      "filePath": "modules/nvim/files/lua/configs/lazy.lua",
+      "summary": "nvim Lua 配置：lazy。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/configs/lspconfig.lua",
+      "type": "file",
+      "name": "lspconfig.lua",
+      "filePath": "modules/nvim/files/lua/configs/lspconfig.lua",
+      "summary": "nvim Lua 配置：lspconfig。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/mappings.lua",
+      "type": "file",
+      "name": "mappings.lua",
+      "filePath": "modules/nvim/files/lua/mappings.lua",
+      "summary": "nvim Lua 配置：mappings。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/options.lua",
+      "type": "file",
+      "name": "options.lua",
+      "filePath": "modules/nvim/files/lua/options.lua",
+      "summary": "nvim Lua 配置：options。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/files/lua/plugins/init.lua",
+      "type": "file",
+      "name": "init.lua",
+      "filePath": "modules/nvim/files/lua/plugins/init.lua",
+      "summary": "nvim Lua 配置：init。",
+      "tags": [
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/install.sh",
+      "type": "file",
+      "name": "nvim/install.sh",
+      "filePath": "modules/nvim/install.sh",
+      "summary": "nvim 模块（Neovim + NvChad）的 install 钩子。",
+      "tags": [
+        "module",
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/meta.sh",
+      "type": "file",
+      "name": "nvim/meta.sh",
+      "filePath": "modules/nvim/meta.sh",
+      "summary": "nvim 模块（Neovim + NvChad）的 meta 元数据。",
+      "tags": [
+        "module",
+        "nvim"
+      ]
+    },
+    {
+      "id": "file:modules/nvim/uninstall.sh",
+      "type": "file",
+      "name": "nvim/uninstall.sh",
+      "filePath": "modules/nvim/uninstall.sh",
+      "summary": "nvim 模块（Neovim + NvChad）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "nvim"
+      ]
+    },
+    {
+      "id": "config:modules/tmux/files/.tmux.conf",
+      "type": "config",
+      "name": ".tmux.conf",
+      "filePath": "modules/tmux/files/.tmux.conf",
+      "summary": "tmux 配置：Ctrl-a、分屏、窗口交换、TPM 插件。",
+      "tags": [
+        "tmux",
+        "config"
+      ]
+    },
+    {
+      "id": "file:modules/tmux/install.sh",
+      "type": "file",
+      "name": "tmux/install.sh",
+      "filePath": "modules/tmux/install.sh",
+      "summary": "tmux 模块（终端复用 + TPM）的 install 钩子。",
+      "tags": [
+        "module",
+        "tmux"
+      ]
+    },
+    {
+      "id": "file:modules/tmux/meta.sh",
+      "type": "file",
+      "name": "tmux/meta.sh",
+      "filePath": "modules/tmux/meta.sh",
+      "summary": "tmux 模块（终端复用 + TPM）的 meta 元数据。",
+      "tags": [
+        "module",
+        "tmux"
+      ]
+    },
+    {
+      "id": "file:modules/tmux/uninstall.sh",
+      "type": "file",
+      "name": "tmux/uninstall.sh",
+      "filePath": "modules/tmux/uninstall.sh",
+      "summary": "tmux 模块（终端复用 + TPM）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "tmux"
+      ]
+    },
+    {
+      "id": "file:modules/zoxide/install.sh",
+      "type": "file",
+      "name": "zoxide/install.sh",
+      "filePath": "modules/zoxide/install.sh",
+      "summary": "zoxide 模块（更聪明的 cd）的 install 钩子。",
+      "tags": [
+        "module",
+        "zoxide"
+      ]
+    },
+    {
+      "id": "file:modules/zoxide/meta.sh",
+      "type": "file",
+      "name": "zoxide/meta.sh",
+      "filePath": "modules/zoxide/meta.sh",
+      "summary": "zoxide 模块（更聪明的 cd）的 meta 元数据。",
+      "tags": [
+        "module",
+        "zoxide"
+      ]
+    },
+    {
+      "id": "file:modules/zoxide/uninstall.sh",
+      "type": "file",
+      "name": "zoxide/uninstall.sh",
+      "filePath": "modules/zoxide/uninstall.sh",
+      "summary": "zoxide 模块（更聪明的 cd）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "zoxide"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.fzf.zsh",
+      "type": "file",
+      "name": ".fzf.zsh",
+      "filePath": "modules/zsh/files/.fzf.zsh",
+      "summary": ".fzf.zsh（script）。",
+      "tags": [
+        "script"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.p10k.zsh",
+      "type": "file",
+      "name": ".p10k.zsh",
+      "filePath": "modules/zsh/files/.p10k.zsh",
+      "summary": ".p10k.zsh（script）。",
+      "tags": [
+        "script"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshenv",
+      "type": "file",
+      "name": ".zshenv",
+      "filePath": "modules/zsh/files/.zshenv",
+      "summary": "最早加载：PATH + TERM。",
+      "tags": [
+        "zsh",
+        "env"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc",
+      "type": "file",
+      "name": ".zshrc",
+      "filePath": "modules/zsh/files/.zshrc",
+      "summary": "按序 source .zshrc.d 切片。",
+      "tags": [
+        "zsh",
+        "loader"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/aliases.zsh",
+      "type": "file",
+      "name": "aliases.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/aliases.zsh",
+      "summary": "zsh 配置切片：aliases。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/core.zsh",
+      "type": "file",
+      "name": "core.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/core.zsh",
+      "summary": "zsh 配置切片：core。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/env.zsh",
+      "type": "file",
+      "name": "env.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/env.zsh",
+      "summary": "zsh 配置切片：env。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/functions.zsh",
+      "type": "file",
+      "name": "functions.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/functions.zsh",
+      "summary": "zsh 配置切片：functions。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/local.zsh.example",
+      "type": "file",
+      "name": "local.zsh.example",
+      "filePath": "modules/zsh/files/.zshrc.d/local.zsh.example",
+      "summary": "zsh 配置切片：local.example。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/nvm.zsh",
+      "type": "file",
+      "name": "nvm.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/nvm.zsh",
+      "summary": "zsh 配置切片：nvm。",
+      "tags": [
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "type": "file",
+      "name": "platform.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/platform.zsh",
+      "summary": "运行期平台探测(canonical 规则) + 加载 platform/<os>。",
+      "tags": [
+        "zsh",
+        "platform"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/platform/docker.zsh",
+      "type": "file",
+      "name": "docker.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/platform/docker.zsh",
+      "summary": "docker 平台专属 zsh 配置。",
+      "tags": [
+        "zsh",
+        "platform"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/platform/linux.zsh",
+      "type": "file",
+      "name": "linux.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/platform/linux.zsh",
+      "summary": "linux 平台专属 zsh 配置。",
+      "tags": [
+        "zsh",
+        "platform"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/platform/macos.zsh",
+      "type": "file",
+      "name": "macos.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/platform/macos.zsh",
+      "summary": "macos 平台专属 zsh 配置。",
+      "tags": [
+        "zsh",
+        "platform"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/platform/wsl2.zsh",
+      "type": "file",
+      "name": "wsl2.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/platform/wsl2.zsh",
+      "summary": "wsl2 平台专属 zsh 配置。",
+      "tags": [
+        "zsh",
+        "platform"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/files/.zshrc.d/tools.zsh",
+      "type": "file",
+      "name": "tools.zsh",
+      "filePath": "modules/zsh/files/.zshrc.d/tools.zsh",
+      "summary": "fzf/zoxide/atuin/direnv 集成 + envup 补全。",
+      "tags": [
+        "zsh",
+        "tools"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/install.sh",
+      "type": "file",
+      "name": "zsh/install.sh",
+      "filePath": "modules/zsh/install.sh",
+      "summary": "zsh 模块（zsh + OMZ + p10k）的 install 钩子。",
+      "tags": [
+        "module",
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/meta.sh",
+      "type": "file",
+      "name": "zsh/meta.sh",
+      "filePath": "modules/zsh/meta.sh",
+      "summary": "zsh 模块（zsh + OMZ + p10k）的 meta 元数据。",
+      "tags": [
+        "module",
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:modules/zsh/uninstall.sh",
+      "type": "file",
+      "name": "zsh/uninstall.sh",
+      "filePath": "modules/zsh/uninstall.sh",
+      "summary": "zsh 模块（zsh + OMZ + p10k）的 uninstall 钩子。",
+      "tags": [
+        "module",
+        "zsh"
+      ]
+    },
+    {
+      "id": "file:profiles/full.sh",
+      "type": "file",
+      "name": "full",
+      "filePath": "profiles/full.sh",
+      "summary": "profile：use_profile standard + nvim（组合）。",
+      "tags": [
+        "profile"
+      ]
+    },
+    {
+      "id": "file:profiles/minimal.sh",
+      "type": "file",
+      "name": "minimal",
+      "filePath": "profiles/minimal.sh",
+      "summary": "profile：zsh git（MODULES+=）。",
+      "tags": [
+        "profile"
+      ]
+    },
+    {
+      "id": "file:profiles/standard.sh",
+      "type": "file",
+      "name": "standard",
+      "filePath": "profiles/standard.sh",
+      "summary": "profile：use_profile minimal + tmux fzf zoxide atuin（组合）。",
+      "tags": [
+        "profile"
+      ]
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README",
+      "filePath": "README.md",
+      "summary": "英文说明：定位/徽章/快览/命令/profile/模块/保证。",
+      "tags": [
+        "docs",
+        "readme"
+      ]
+    },
+    {
+      "id": "document:README.zh-CN.md",
+      "type": "document",
+      "name": "README.zh-CN",
+      "filePath": "README.zh-CN.md",
+      "summary": "中文说明（与英文对应）。",
+      "tags": [
+        "docs",
+        "i18n"
+      ]
+    },
+    {
+      "id": "file:scripts/lint.sh",
+      "type": "file",
+      "name": "lint.sh",
+      "filePath": "scripts/lint.sh",
+      "summary": "静态检查：shellcheck + bash -n + lib.sh 行数软阈值(400)。",
+      "tags": [
+        "lint",
+        "ci"
+      ]
+    },
+    {
+      "id": "file:scripts/test.sh",
+      "type": "file",
+      "name": "test.sh",
+      "filePath": "scripts/test.sh",
+      "summary": "测试入口：bats 跑 unit + integration。",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "document:SECURITY.md",
+      "type": "document",
+      "name": "SECURITY",
+      "filePath": "SECURITY.md",
+      "summary": "安全披露流程。",
+      "tags": [
+        "docs",
+        "community"
+      ]
+    },
+    {
+      "id": "file:tests/integration/cli.bats",
+      "type": "file",
+      "name": "cli.bats",
+      "filePath": "tests/integration/cli.bats",
+      "summary": "集成测试：cli。",
+      "tags": [
+        "test",
+        "integration"
+      ]
+    },
+    {
+      "id": "file:tests/integration/doctor.bats",
+      "type": "file",
+      "name": "doctor.bats",
+      "filePath": "tests/integration/doctor.bats",
+      "summary": "集成测试：doctor。",
+      "tags": [
+        "test",
+        "integration"
+      ]
+    },
+    {
+      "id": "file:tests/integration/dry-run.bats",
+      "type": "file",
+      "name": "dry-run.bats",
+      "filePath": "tests/integration/dry-run.bats",
+      "summary": "集成测试：dry-run。",
+      "tags": [
+        "test",
+        "integration"
+      ]
+    },
+    {
+      "id": "file:tests/integration/profile-compose.bats",
+      "type": "file",
+      "name": "profile-compose.bats",
+      "filePath": "tests/integration/profile-compose.bats",
+      "summary": "集成测试：profile-compose。",
+      "tags": [
+        "test",
+        "integration"
+      ]
+    },
+    {
+      "id": "file:tests/integration/smoke.sh",
+      "type": "file",
+      "name": "smoke.sh",
+      "filePath": "tests/integration/smoke.sh",
+      "summary": "smoke.sh（script）。",
+      "tags": [
+        "script"
+      ]
+    },
+    {
+      "id": "file:tests/test_helper.bash",
+      "type": "file",
+      "name": "test_helper",
+      "filePath": "tests/test_helper.bash",
+      "summary": "bats 沙箱：临时 HOME/ENVUP_HOME + mk_module + source lib.sh。",
+      "tags": [
+        "test",
+        "harness"
+      ]
+    },
+    {
+      "id": "file:tests/unit/block.bats",
+      "type": "file",
+      "name": "block.bats",
+      "filePath": "tests/unit/block.bats",
+      "summary": "单元测试：block 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/ghurl.bats",
+      "type": "file",
+      "name": "ghurl.bats",
+      "filePath": "tests/unit/ghurl.bats",
+      "summary": "单元测试：ghurl 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/link.bats",
+      "type": "file",
+      "name": "link.bats",
+      "filePath": "tests/unit/link.bats",
+      "summary": "单元测试：link 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/loglevel.bats",
+      "type": "file",
+      "name": "loglevel.bats",
+      "filePath": "tests/unit/loglevel.bats",
+      "summary": "单元测试：loglevel 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/manifest.bats",
+      "type": "file",
+      "name": "manifest.bats",
+      "filePath": "tests/unit/manifest.bats",
+      "summary": "单元测试：manifest 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/meta.bats",
+      "type": "file",
+      "name": "meta.bats",
+      "filePath": "tests/unit/meta.bats",
+      "summary": "单元测试：meta 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/platform.bats",
+      "type": "file",
+      "name": "platform.bats",
+      "filePath": "tests/unit/platform.bats",
+      "summary": "单元测试：platform 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/resolve_order.bats",
+      "type": "file",
+      "name": "resolve_order.bats",
+      "filePath": "tests/unit/resolve_order.bats",
+      "summary": "单元测试：resolve_order 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "file:tests/unit/unlink.bats",
+      "type": "file",
+      "name": "unlink.bats",
+      "filePath": "tests/unit/unlink.bats",
+      "summary": "单元测试：unlink 相关逻辑。",
+      "tags": [
+        "test",
+        "unit"
+      ]
+    },
+    {
+      "id": "config:VERSION",
+      "type": "config",
+      "name": "VERSION",
+      "filePath": "VERSION",
+      "summary": "版本号（0.2.0-dev），被 envup --version 读取。",
+      "tags": [
+        "version",
+        "config"
+      ]
+    },
+    {
+      "id": "function:lib.sh:log_info",
+      "type": "function",
+      "name": "log_info",
+      "filePath": "lib.sh",
+      "summary": "带级别门控的日志(info)。",
+      "tags": [
+        "logging"
+      ]
+    },
+    {
+      "id": "function:lib.sh:log_debug",
+      "type": "function",
+      "name": "log_debug",
+      "filePath": "lib.sh",
+      "summary": "debug 级日志(默认隐藏)。",
+      "tags": [
+        "logging"
+      ]
+    },
+    {
+      "id": "function:lib.sh:_should_log",
+      "type": "function",
+      "name": "_should_log",
+      "filePath": "lib.sh",
+      "summary": "ENVUP_LOG_LEVEL 级别闸。",
+      "tags": [
+        "logging"
+      ]
+    },
+    {
+      "id": "function:lib.sh:pkg_install",
+      "type": "function",
+      "name": "pkg_install",
+      "filePath": "lib.sh",
+      "summary": "跨平台装包。",
+      "tags": [
+        "package"
+      ]
+    },
+    {
+      "id": "function:lib.sh:safe_link",
+      "type": "function",
+      "name": "safe_link",
+      "filePath": "lib.sh",
+      "summary": "安全软链入口。",
+      "tags": [
+        "symlink"
+      ]
+    },
+    {
+      "id": "function:lib.sh:_link",
+      "type": "function",
+      "name": "_link",
+      "filePath": "lib.sh",
+      "summary": "备份后建链、幂等、dry-run(I1/I2)。",
+      "tags": [
+        "symlink",
+        "backup"
+      ]
+    },
+    {
+      "id": "function:lib.sh:unlink_safe",
+      "type": "function",
+      "name": "unlink_safe",
+      "filePath": "lib.sh",
+      "summary": "只删自建软链(I3)。",
+      "tags": [
+        "symlink"
+      ]
+    },
+    {
+      "id": "function:lib.sh:is_envup_link",
+      "type": "function",
+      "name": "is_envup_link",
+      "filePath": "lib.sh",
+      "summary": "判断是否指向仓库的软链。",
+      "tags": [
+        "symlink"
+      ]
+    },
+    {
+      "id": "function:lib.sh:block_set",
+      "type": "function",
+      "name": "block_set",
+      "filePath": "lib.sh",
+      "summary": "幂等标记块写入。",
+      "tags": [
+        "block"
+      ]
+    },
+    {
+      "id": "function:lib.sh:net_run",
+      "type": "function",
+      "name": "net_run",
+      "filePath": "lib.sh",
+      "summary": "网络命令超时包装。",
+      "tags": [
+        "network"
+      ]
+    },
+    {
+      "id": "function:lib.sh:gh_url",
+      "type": "function",
+      "name": "gh_url",
+      "filePath": "lib.sh",
+      "summary": "ENVUP_GH_MIRROR 镜像改写(未设=原样)。",
+      "tags": [
+        "network",
+        "mirror"
+      ]
+    },
+    {
+      "id": "function:lib.sh:submodule_ensure",
+      "type": "function",
+      "name": "submodule_ensure",
+      "filePath": "lib.sh",
+      "summary": "拉取并校验子模块非空。",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "id": "function:lib.sh:manifest_add",
+      "type": "function",
+      "name": "manifest_add",
+      "filePath": "lib.sh",
+      "summary": "写 manifest(带 schema 头)。",
+      "tags": [
+        "manifest"
+      ]
+    },
+    {
+      "id": "function:lib.sh:manifest_list",
+      "type": "function",
+      "name": "manifest_list",
+      "filePath": "lib.sh",
+      "summary": "读 manifest(忽略注释)。",
+      "tags": [
+        "manifest"
+      ]
+    },
+    {
+      "id": "function:lib.sh:_manifest_ensure",
+      "type": "function",
+      "name": "_manifest_ensure",
+      "filePath": "lib.sh",
+      "summary": "首建 manifest 写 schema 头。",
+      "tags": [
+        "manifest"
+      ]
+    },
+    {
+      "id": "function:lib.sh:module_meta",
+      "type": "function",
+      "name": "module_meta",
+      "filePath": "lib.sh",
+      "summary": "读 meta.sh 字段。",
+      "tags": [
+        "module"
+      ]
+    },
+    {
+      "id": "function:lib.sh:resolve_order",
+      "type": "function",
+      "name": "resolve_order",
+      "filePath": "lib.sh",
+      "summary": "DEPENDS 拓扑排序(I5)。",
+      "tags": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "function:lib.sh:use_profile",
+      "type": "function",
+      "name": "use_profile",
+      "filePath": "lib.sh",
+      "summary": "profile 组合：并入另一 profile 的 MODULES。",
+      "tags": [
+        "profile"
+      ]
+    },
+    {
+      "id": "function:lib.sh:load_profile",
+      "type": "function",
+      "name": "load_profile",
+      "filePath": "lib.sh",
+      "summary": "加载 profile → MODULES。",
+      "tags": [
+        "profile"
+      ]
+    },
+    {
+      "id": "function:lib.sh:run_module_hook",
+      "type": "function",
+      "name": "run_module_hook",
+      "filePath": "lib.sh",
+      "summary": "子 shell 里跑模块钩子。",
+      "tags": [
+        "module"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_install",
+      "type": "function",
+      "name": "cmd_install",
+      "filePath": "envup",
+      "summary": "解析/定序/装 SELF_DEPS/跑钩子/写 manifest。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_uninstall",
+      "type": "function",
+      "name": "cmd_uninstall",
+      "filePath": "envup",
+      "summary": "卸载模块并更新 manifest。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_upgrade",
+      "type": "function",
+      "name": "cmd_upgrade",
+      "filePath": "envup",
+      "summary": "pull 或 --ref 切换后重装。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_status",
+      "type": "function",
+      "name": "cmd_status",
+      "filePath": "envup",
+      "summary": "status；--json 走 _status_json。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:_status_json",
+      "type": "function",
+      "name": "_status_json",
+      "filePath": "envup",
+      "summary": "输出机器可读 JSON。",
+      "tags": [
+        "command",
+        "json"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_clean",
+      "type": "function",
+      "name": "cmd_clean",
+      "filePath": "envup",
+      "summary": "清 CLEAN_PATHS 缓存。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_log",
+      "type": "function",
+      "name": "cmd_log",
+      "filePath": "envup",
+      "summary": "查看最近日志。",
+      "tags": [
+        "command"
+      ]
+    },
+    {
+      "id": "function:envup:cmd_doctor",
+      "type": "function",
+      "name": "cmd_doctor",
+      "filePath": "envup",
+      "summary": "模块规范静态校验。",
+      "tags": [
+        "command",
+        "doctor"
+      ]
+    },
+    {
+      "id": "function:envup:_doctor_module",
+      "type": "function",
+      "name": "_doctor_module",
+      "filePath": "envup",
+      "summary": "单模块校验：字段/DEPENDS/语法/顶层local/CLEAN_PATHS。",
+      "tags": [
+        "doctor"
+      ]
+    },
+    {
+      "id": "function:envup:envup_version",
+      "type": "function",
+      "name": "envup_version",
+      "filePath": "envup",
+      "summary": "读 VERSION 或 git describe。",
+      "tags": [
+        "version"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:log_info",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:log_debug",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:_should_log",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:safe_link",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:_link",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:is_envup_link",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:block_set",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:net_run",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:gh_url",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:submodule_ensure",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:manifest_add",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:manifest_list",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:_manifest_ensure",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:module_meta",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:resolve_order",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:use_profile",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:load_profile",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "function:lib.sh:run_module_hook",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_install",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_uninstall",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_upgrade",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_status",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:_status_json",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_clean",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_log",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:cmd_doctor",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:_doctor_module",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "function:envup:envup_version",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:envup",
+      "target": "file:lib.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "function:envup:cmd_install",
+      "target": "function:lib.sh:load_profile",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_install",
+      "target": "function:lib.sh:resolve_order",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_install",
+      "target": "function:lib.sh:run_module_hook",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_install",
+      "target": "function:lib.sh:manifest_add",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_install",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_uninstall",
+      "target": "function:lib.sh:run_module_hook",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_upgrade",
+      "target": "function:envup:cmd_install",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_upgrade",
+      "target": "function:lib.sh:net_run",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "function:envup:cmd_status",
+      "target": "function:envup:_status_json",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_status",
+      "target": "function:lib.sh:module_meta",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "function:envup:cmd_clean",
+      "target": "function:lib.sh:module_meta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:cmd_doctor",
+      "target": "function:envup:_doctor_module",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:_doctor_module",
+      "target": "function:lib.sh:module_meta",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:envup:envup_version",
+      "target": "config:VERSION",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "function:lib.sh:resolve_order",
+      "target": "function:lib.sh:module_meta",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "function:lib.sh:load_profile",
+      "target": "function:lib.sh:use_profile",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "function:lib.sh:safe_link",
+      "target": "function:lib.sh:_link",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "function:lib.sh:manifest_add",
+      "target": "function:lib.sh:_manifest_ensure",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/atuin/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/atuin/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/atuin/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/atuin/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/fzf/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/fzf/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/fzf/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/fzf/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/uninstall.sh",
+      "target": "file:lib.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "function:lib.sh:pkg_install",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/uninstall.sh",
+      "target": "function:lib.sh:unlink_safe",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/install.sh",
+      "target": "function:lib.sh:safe_link",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/nvim/install.sh",
+      "target": "function:lib.sh:safe_link",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "function:lib.sh:safe_link",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "function:lib.sh:safe_link",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/nvim/install.sh",
+      "target": "function:lib.sh:gh_url",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/fzf/install.sh",
+      "target": "function:lib.sh:gh_url",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/install.sh",
+      "target": "function:lib.sh:gh_url",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "function:lib.sh:gh_url",
+      "type": "calls",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "function:lib.sh:submodule_ensure",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "file:modules/tmux/meta.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/tmux/uninstall.sh",
+      "target": "file:modules/tmux/meta.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "function:lib.sh:submodule_ensure",
+      "type": "calls",
+      "weight": 0.8
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "file:modules/zsh/meta.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/uninstall.sh",
+      "target": "file:modules/zsh/meta.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/atuin/meta.sh",
+      "target": "file:modules/zsh/meta.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zoxide/meta.sh",
+      "target": "file:modules/zsh/meta.sh",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:profiles/standard.sh",
+      "target": "file:profiles/minimal.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:profiles/full.sh",
+      "target": "file:profiles/standard.sh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/core.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/env.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/aliases.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/functions.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/tools.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc",
+      "target": "file:modules/zsh/files/.zshrc.d/nvm.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "target": "file:modules/zsh/files/.zshrc.d/platform/linux.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "target": "file:modules/zsh/files/.zshrc.d/platform/macos.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "target": "file:modules/zsh/files/.zshrc.d/platform/wsl2.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/platform.zsh",
+      "target": "file:modules/zsh/files/.zshrc.d/platform/docker.zsh",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/tools.zsh",
+      "target": "file:modules/zsh/files/.fzf.zsh",
+      "type": "imports",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/files/.zshrc.d/core.zsh",
+      "target": "file:modules/zsh/files/.p10k.zsh",
+      "type": "imports",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/zsh/install.sh",
+      "target": "file:modules/zsh/files/.zshrc",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/files/init.lua",
+      "target": "file:modules/nvim/files/lua/plugins/init.lua",
+      "type": "imports",
+      "weight": 0.7
+    },
+    {
+      "source": "file:modules/nvim/files/init.lua",
+      "target": "config:modules/nvim/files/lazy-lock.json",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/files/lua/plugins/init.lua",
+      "target": "file:modules/nvim/files/lua/configs/lspconfig.lua",
+      "type": "imports",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/files/lua/plugins/init.lua",
+      "target": "file:modules/nvim/files/lua/configs/conform.lua",
+      "type": "imports",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/nvim/install.sh",
+      "target": "file:modules/nvim/files/init.lua",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/git/install.sh",
+      "target": "config:modules/git/files/.gitconfig",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "file:modules/tmux/install.sh",
+      "target": "config:modules/tmux/files/.tmux.conf",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/resolve_order.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/link.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/unlink.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/block.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/manifest.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/meta.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/loglevel.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/ghurl.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:lib.sh",
+      "target": "file:tests/unit/platform.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:envup",
+      "target": "file:tests/integration/cli.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:envup",
+      "target": "file:tests/integration/doctor.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:envup",
+      "target": "file:tests/integration/dry-run.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:envup",
+      "target": "file:tests/integration/profile-compose.bats",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:envup",
+      "target": "file:tests/integration/smoke.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/test.sh",
+      "target": "file:tests/test_helper.bash",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/lint.sh",
+      "target": "config:.shellcheckrc",
+      "type": "configures",
+      "weight": 0.5
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:scripts/lint.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:scripts/test.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:tests/integration/smoke.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:envup",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/ARCHITECTURE.md",
+      "target": "file:lib.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CONTRIBUTING.md",
+      "target": "file:lib.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.zh-CN.md",
+      "target": "document:README.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.gitmodules",
+      "target": "file:modules/zsh/install.sh",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.gitmodules",
+      "target": "file:modules/tmux/install.sh",
+      "type": "related",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:ci",
+      "name": "CI 与社区",
+      "description": "GitHub Actions 与 issue/PR 模板",
+      "nodeIds": [
+        "document:.github/ISSUE_TEMPLATE/bug_report.md",
+        "config:.github/ISSUE_TEMPLATE/config.yml",
+        "document:.github/ISSUE_TEMPLATE/feature_request.md",
+        "document:.github/PULL_REQUEST_TEMPLATE.md",
+        "pipeline:.github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "layer:meta",
+      "name": "仓库元数据",
+      "description": "VERSION / .gitmodules / .shellcheckrc",
+      "nodeIds": [
+        "config:.gitmodules",
+        "config:.shellcheckrc",
+        "config:VERSION"
+      ]
+    },
+    {
+      "id": "layer:docs",
+      "name": "文档",
+      "description": "README / 指南 / 重构文档",
+      "nodeIds": [
+        "document:CHANGELOG.md",
+        "document:CODE_OF_CONDUCT.md",
+        "document:CONTRIBUTING.md",
+        "document:docs/ARCHITECTURE.md",
+        "document:docs/REFACTOR_BASELINE.md",
+        "document:docs/REFACTOR_PLAN.md",
+        "document:docs/REFACTOR_REPORT.md",
+        "document:README.md",
+        "document:README.zh-CN.md",
+        "document:SECURITY.md"
+      ]
+    },
+    {
+      "id": "layer:cli",
+      "name": "CLI 入口",
+      "description": "envup 命令与补全",
+      "nodeIds": [
+        "file:completions/_envup",
+        "file:envup"
+      ]
+    },
+    {
+      "id": "layer:core",
+      "name": "核心库",
+      "description": "lib.sh 共享基础设施",
+      "nodeIds": [
+        "file:lib.sh"
+      ]
+    },
+    {
+      "id": "layer:modules",
+      "name": "模块系统",
+      "description": "各模块 meta/install/uninstall 钩子",
+      "nodeIds": [
+        "file:modules/atuin/install.sh",
+        "file:modules/atuin/meta.sh",
+        "file:modules/atuin/uninstall.sh",
+        "file:modules/fzf/install.sh",
+        "file:modules/fzf/meta.sh",
+        "file:modules/fzf/uninstall.sh",
+        "file:modules/git/install.sh",
+        "file:modules/git/meta.sh",
+        "file:modules/git/uninstall.sh",
+        "file:modules/nvim/install.sh",
+        "file:modules/nvim/meta.sh",
+        "file:modules/nvim/uninstall.sh",
+        "file:modules/tmux/install.sh",
+        "file:modules/tmux/meta.sh",
+        "file:modules/tmux/uninstall.sh",
+        "file:modules/zoxide/install.sh",
+        "file:modules/zoxide/meta.sh",
+        "file:modules/zoxide/uninstall.sh",
+        "file:modules/zsh/install.sh",
+        "file:modules/zsh/meta.sh",
+        "file:modules/zsh/uninstall.sh"
+      ]
+    },
+    {
+      "id": "layer:app-config",
+      "name": "应用配置",
+      "description": "git / tmux dotfiles",
+      "nodeIds": [
+        "config:modules/git/files/.gitconfig",
+        "config:modules/tmux/files/.tmux.conf"
+      ]
+    },
+    {
+      "id": "layer:nvim-config",
+      "name": "nvim 配置",
+      "description": "NvChad/lazy 的 Lua 配置",
+      "nodeIds": [
+        "file:modules/nvim/files/init.lua",
+        "config:modules/nvim/files/lazy-lock.json",
+        "file:modules/nvim/files/lua/autocmds.lua",
+        "file:modules/nvim/files/lua/chadrc.lua",
+        "file:modules/nvim/files/lua/configs/conform.lua",
+        "file:modules/nvim/files/lua/configs/lazy.lua",
+        "file:modules/nvim/files/lua/configs/lspconfig.lua",
+        "file:modules/nvim/files/lua/mappings.lua",
+        "file:modules/nvim/files/lua/options.lua",
+        "file:modules/nvim/files/lua/plugins/init.lua"
+      ]
+    },
+    {
+      "id": "layer:zsh-config",
+      "name": "zsh 配置",
+      "description": "软链到 $HOME 的 zsh 运行时配置",
+      "nodeIds": [
+        "file:modules/zsh/files/.fzf.zsh",
+        "file:modules/zsh/files/.p10k.zsh",
+        "file:modules/zsh/files/.zshenv",
+        "file:modules/zsh/files/.zshrc",
+        "file:modules/zsh/files/.zshrc.d/aliases.zsh",
+        "file:modules/zsh/files/.zshrc.d/core.zsh",
+        "file:modules/zsh/files/.zshrc.d/env.zsh",
+        "file:modules/zsh/files/.zshrc.d/functions.zsh",
+        "file:modules/zsh/files/.zshrc.d/local.zsh.example",
+        "file:modules/zsh/files/.zshrc.d/nvm.zsh",
+        "file:modules/zsh/files/.zshrc.d/platform.zsh",
+        "file:modules/zsh/files/.zshrc.d/platform/docker.zsh",
+        "file:modules/zsh/files/.zshrc.d/platform/linux.zsh",
+        "file:modules/zsh/files/.zshrc.d/platform/macos.zsh",
+        "file:modules/zsh/files/.zshrc.d/platform/wsl2.zsh",
+        "file:modules/zsh/files/.zshrc.d/tools.zsh"
+      ]
+    },
+    {
+      "id": "layer:profiles",
+      "name": "Profiles",
+      "description": "可组合的模块集合",
+      "nodeIds": [
+        "file:profiles/full.sh",
+        "file:profiles/minimal.sh",
+        "file:profiles/standard.sh"
+      ]
+    },
+    {
+      "id": "layer:tests",
+      "name": "测试与脚本",
+      "description": "bats 测试 + lint/test 脚本",
+      "nodeIds": [
+        "file:scripts/lint.sh",
+        "file:scripts/test.sh",
+        "file:tests/integration/cli.bats",
+        "file:tests/integration/doctor.bats",
+        "file:tests/integration/dry-run.bats",
+        "file:tests/integration/profile-compose.bats",
+        "file:tests/integration/smoke.sh",
+        "file:tests/test_helper.bash",
+        "file:tests/unit/block.bats",
+        "file:tests/unit/ghurl.bats",
+        "file:tests/unit/link.bats",
+        "file:tests/unit/loglevel.bats",
+        "file:tests/unit/manifest.bats",
+        "file:tests/unit/meta.bats",
+        "file:tests/unit/platform.bats",
+        "file:tests/unit/resolve_order.bats",
+        "file:tests/unit/unlink.bats"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "从 README 认识 envup",
+      "description": "定位、快览、命令与保证。",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "CLI 与命令分发",
+      "description": "envup 分发到 cmd_*（含新增 doctor / --version）。",
+      "nodeIds": [
+        "file:envup"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "核心库 lib.sh",
+      "description": "日志/软链/依赖/manifest/gh_url 等一站式。",
+      "nodeIds": [
+        "file:lib.sh"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "安装流程",
+      "description": "cmd_install → resolve_order → run_module_hook → manifest。",
+      "nodeIds": [
+        "function:envup:cmd_install",
+        "function:lib.sh:resolve_order",
+        "function:lib.sh:run_module_hook"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Profile 组合",
+      "description": "full = use_profile standard + nvim。",
+      "nodeIds": [
+        "file:profiles/full.sh",
+        "file:profiles/standard.sh",
+        "file:profiles/minimal.sh"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "质量护栏（新增）",
+      "description": "shellcheck + bats + CI，守护六项不变量。",
+      "nodeIds": [
+        "file:scripts/lint.sh",
+        "file:tests/test_helper.bash",
+        "pipeline:.github/workflows/ci.yml"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "可控与可扩展（新增）",
+      "description": "status --json、doctor、gh_url 镜像。",
+      "nodeIds": [
+        "function:envup:_status_json",
+        "function:envup:cmd_doctor",
+        "function:lib.sh:gh_url"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "架构与贡献",
+      "description": "保证、平台规则、发布流程。",
+      "nodeIds": [
+        "document:docs/ARCHITECTURE.md",
+        "document:CONTRIBUTING.md",
+        "document:docs/REFACTOR_REPORT.md"
+      ]
+    }
+  ]
+}

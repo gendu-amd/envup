@@ -1,0 +1,24 @@
+[submodule "modules/zsh/files/plugins/powerlevel10k"]
+	path = modules/zsh/files/plugins/powerlevel10k
+	url = https://github.com/romkatv/powerlevel10k.git
+[submodule "modules/zsh/files/plugins/zsh-autosuggestions"]
+	path = modules/zsh/files/plugins/zsh-autosuggestions
+	url = https://github.com/zsh-users/zsh-autosuggestions.git
+[submodule "modules/zsh/files/plugins/zsh-syntax-highlighting"]
+	path = modules/zsh/files/plugins/zsh-syntax-highlighting
+	url = https://github.com/zsh-users/zsh-syntax-highlighting.git
+[submodule "modules/tmux/files/plugins/tpm"]
+	path = modules/tmux/files/plugins/tpm
+	url = https://github.com/tmux-plugins/tpm.git
+[submodule "modules/tmux/files/plugins/tmux-sensible"]
+	path = modules/tmux/files/plugins/tmux-sensible
+	url = https://github.com/tmux-plugins/tmux-sensible.git
+[submodule "modules/tmux/files/plugins/tmux-resurrect"]
+	path = modules/tmux/files/plugins/tmux-resurrect
+	url = https://github.com/tmux-plugins/tmux-resurrect.git
+[submodule "modules/tmux/files/plugins/tmux-continuum"]
+	path = modules/tmux/files/plugins/tmux-continuum
+	url = https://github.com/tmux-plugins/tmux-continuum.git
+[submodule "modules/tmux/files/plugins/vim-tmux-navigator"]
+	path = modules/tmux/files/plugins/vim-tmux-navigator
+	url = https://github.com/christoomey/vim-tmux-navigator.git

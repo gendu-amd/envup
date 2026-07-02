@@ -1,0 +1,61 @@
+#compdef envup
+# zsh completion for envup. Auto-loaded by the zsh module's tools file.
+
+_envup() {
+    local -a subcommands
+    subcommands=(
+        'install:Install modules (by profile or by name)'
+        'uninstall:Remove installed modules'
+        'upgrade:Pull latest config and reinstall'
+        'status:Show installed modules and platform info'
+        'clean:Clear caches declared in each module meta.sh'
+        'log:Show the latest command log'
+        'help:Show usage'
+    )
+
+    # Locate the envup repo so we can list modules / profiles dynamically.
+    local _bin _home
+    _bin=$(whence -p envup 2>/dev/null) || _bin=""
+    [[ -n "$_bin" ]] && _home=$(dirname "$(readlink -f "$_bin" 2>/dev/null || echo "$_bin")")
+
+    local -a _modules _profiles
+    [[ -n "$_home" && -d "$_home/modules" ]]  && _modules=("$_home"/modules/*(N/:t))
+    [[ -n "$_home" && -d "$_home/profiles" ]] && _profiles=("$_home"/profiles/*.sh(N:t:r))
+
+    _arguments -C '1: :->subcmd' '*::arg:->args'
+
+    case $state in
+        subcmd) _describe -t commands 'envup command' subcommands ;;
+        args)
+            case $words[1] in
+                install|upgrade)
+                    _arguments \
+                        '--profile[Use a profile]:profile:('"${_profiles[*]}"')' \
+                        '-p[Use a profile]:profile:('"${_profiles[*]}"')' \
+                        '--dry-run[Preview]' '-n[Preview]' \
+                        '--keep-going[upgrade: continue if git pull fails]' \
+                        '--help[Show help]' \
+                        '*:module:('"${_modules[*]}"')'
+                    ;;
+                uninstall)
+                    _arguments \
+                        '--all[Remove every installed module]' \
+                        '--dry-run[Preview]' '-n[Preview]' \
+                        '--help[Show help]' \
+                        '*:module:('"${_modules[*]}"')'
+                    ;;
+                clean)
+                    _arguments \
+                        '--all[Clean every module]' \
+                        '--dry-run[Preview]' '-n[Preview]' \
+                        '--help[Show help]' \
+                        '*:module:('"${_modules[*]}"')'
+                    ;;
+                status) _arguments '--help[Show help]' ;;
+                log)    _arguments '--tail[Follow live]' '-f[Follow live]' '--help[Show help]' ;;
+            esac
+            ;;
+    esac
+}
+
+_envup "$@"

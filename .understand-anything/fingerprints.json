@@ -1,0 +1,1179 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "d084a5f2f98a76266763fd9810a2674fe222263b",
+  "generatedAt": "2026-07-01T09:12:25.494Z",
+  "files": {
+    ".github/ISSUE_TEMPLATE/config.yml": {
+      "filePath": ".github/ISSUE_TEMPLATE/config.yml",
+      "contentHash": "13064e7bea658e01e718b414fbb7b3b244f36411fe25ee2055c151f7b534547a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": true
+    },
+    ".gitmodules": {
+      "filePath": ".gitmodules",
+      "contentHash": "9cb61d3797012cd2dc92bbc9e6c7fb6de800552099047ad786d1f83fa5bb3f71",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 25,
+      "hasStructuralAnalysis": false
+    },
+    ".shellcheckrc": {
+      "filePath": ".shellcheckrc",
+      "contentHash": "2de4c0e5756d86cb22366222875f3c8aff4993d48c3983ecd630bdbe32af2b13",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 13,
+      "hasStructuralAnalysis": false
+    },
+    "completions/_envup": {
+      "filePath": "completions/_envup",
+      "contentHash": "e03b0d6b96bf3a63f6441917a63192dcb6edced6d5735d0548d765dbd2785109",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 62,
+      "hasStructuralAnalysis": false
+    },
+    "envup": {
+      "filePath": "envup",
+      "contentHash": "697a734ebe534bad0ad69c033a56ae37e43289cae8eee355edd016c612f006b7",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 383,
+      "hasStructuralAnalysis": false
+    },
+    "lib.sh": {
+      "filePath": "lib.sh",
+      "contentHash": "ae4b5985be8ea8bc268e339f4946838f61c29a150243eb3dec23fa6a146fa37c",
+      "functions": [
+        {
+          "name": "_logf",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "_lvl_num",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "_should_log",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_step",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_info",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_success",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_warn",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_error",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_hint",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "log_debug",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "have",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "pkg_have",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "pkg_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "safe_link",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "safe_link_optional",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "_link",
+          "params": [],
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "_block_markers",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "block_set",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "block_del",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "is_envup_link",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "unlink_safe",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "gh_url",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "_net_timeout_bin",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "net_run",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "log_run",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "net_run_logged",
+          "params": [],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "submodule_ensure",
+          "params": [],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "_manifest_ensure",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "manifest_add",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "manifest_remove",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "manifest_has",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "manifest_list",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "modules_available",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "module_exists",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "module_meta",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "module_deps",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "resolve_order",
+          "params": [],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "profiles_available",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "use_profile",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "load_profile",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "run_module_hook",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 281,
+      "hasStructuralAnalysis": true
+    },
+    "modules/atuin/install.sh": {
+      "filePath": "modules/atuin/install.sh",
+      "contentHash": "6ea7b2e15e87f2445c8eb3095602929407e4e595b1c022c2d61a42e8f6167d7e",
+      "functions": [
+        {
+          "name": "_atuin_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 44
+        },
+        {
+          "name": "_atuin_official",
+          "params": [],
+          "exported": false,
+          "lineCount": 28
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 84,
+      "hasStructuralAnalysis": true
+    },
+    "modules/atuin/meta.sh": {
+      "filePath": "modules/atuin/meta.sh",
+      "contentHash": "362e938536f8da349f6c49417eeaec6a889eb4cb354dd143f2d63783c169894c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "modules/atuin/uninstall.sh": {
+      "filePath": "modules/atuin/uninstall.sh",
+      "contentHash": "53127292a928934c44844e3381fc2a9270eb8a88e5c267fdcec70b5fc7501ce4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 12,
+      "hasStructuralAnalysis": true
+    },
+    "modules/fzf/install.sh": {
+      "filePath": "modules/fzf/install.sh",
+      "contentHash": "15e78b918b3b192a42fa7464352f736a33b6ac4e05ecc3b8d52d9f114891b2b9",
+      "functions": [
+        {
+          "name": "_fzf_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 49
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 60,
+      "hasStructuralAnalysis": true
+    },
+    "modules/fzf/meta.sh": {
+      "filePath": "modules/fzf/meta.sh",
+      "contentHash": "a6901ea395a4b5185b999b1db9d2d5c3f0bbf12d16cd289cd09c25a1641a2676",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 20,
+      "hasStructuralAnalysis": true
+    },
+    "modules/fzf/uninstall.sh": {
+      "filePath": "modules/fzf/uninstall.sh",
+      "contentHash": "eced215b8f36b3d32ccf295d50d69fbf8e86480ab65f0ddfeded5230e809ab9e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 11,
+      "hasStructuralAnalysis": true
+    },
+    "modules/git/files/.gitconfig": {
+      "filePath": "modules/git/files/.gitconfig",
+      "contentHash": "790ebca54ea33d6863949895299d64f6b023ddb149ed95b9b7855466ee190da4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 112,
+      "hasStructuralAnalysis": false
+    },
+    "modules/git/install.sh": {
+      "filePath": "modules/git/install.sh",
+      "contentHash": "d1da4c2e396c3b0ab3a87f97e6bab531144334c21049931c024c37644ab58395",
+      "functions": [
+        {
+          "name": "_git_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 28
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 37,
+      "hasStructuralAnalysis": true
+    },
+    "modules/git/meta.sh": {
+      "filePath": "modules/git/meta.sh",
+      "contentHash": "ee37c97c4fba1e3b86e532da3cda8e2a4cde85b419a8306d3e2dbded878eb2cb",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "modules/git/uninstall.sh": {
+      "filePath": "modules/git/uninstall.sh",
+      "contentHash": "bfce63da86d64d60f7a46db020a9522d6374af4936dd5f550bf745486d9b9c79",
+      "functions": [
+        {
+          "name": "_git_uninstall",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 11,
+      "hasStructuralAnalysis": true
+    },
+    "modules/nvim/files/init.lua": {
+      "filePath": "modules/nvim/files/init.lua",
+      "contentHash": "0567c8db7e1189047aaf1c8ee95cf19f3c7a37a42f7bea8fda5fcebf2fecc7d5",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 78,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lazy-lock.json": {
+      "filePath": "modules/nvim/files/lazy-lock.json",
+      "contentHash": "d821c91a46b2a52f9b0a7c8e762d0a1b2a9860e88d3799b2dd9b0aeab9ac93d3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 35,
+      "hasStructuralAnalysis": true
+    },
+    "modules/nvim/files/lua/autocmds.lua": {
+      "filePath": "modules/nvim/files/lua/autocmds.lua",
+      "contentHash": "983369d396ff9e13c1e5f6fce63a9c5e2f8b4aa17c41af8aca396e60992160ad",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/chadrc.lua": {
+      "filePath": "modules/nvim/files/lua/chadrc.lua",
+      "contentHash": "377393d1886501d2e703d437455fd0cca41090887c3f0325b5454c2da34650fd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 25,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/configs/conform.lua": {
+      "filePath": "modules/nvim/files/lua/configs/conform.lua",
+      "contentHash": "35fe734cc409202bf3254cb726fd9abcc09c0a7dfc42676b99d80056a1cdd6c8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 16,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/configs/lazy.lua": {
+      "filePath": "modules/nvim/files/lua/configs/lazy.lua",
+      "contentHash": "3e07056c7e17f7c5a3e863586cb28d9b78689e7b8f7451efe6f7d9315c968a96",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 48,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/configs/lspconfig.lua": {
+      "filePath": "modules/nvim/files/lua/configs/lspconfig.lua",
+      "contentHash": "3d5dbc825eefa1f86bcf5ce75b217cc758513bdf078a5a5bae5c7372c5f00c61",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 49,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/mappings.lua": {
+      "filePath": "modules/nvim/files/lua/mappings.lua",
+      "contentHash": "20524b8cb9c94043e496141a156f5b8db0c4630b4cf6a1fdca402ce7fd650a55",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/options.lua": {
+      "filePath": "modules/nvim/files/lua/options.lua",
+      "contentHash": "9fb41434366e2e155b9d49dc26c5ee57b9258abfdb62b33d6992e5c6dd8cb1d4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 23,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/files/lua/plugins/init.lua": {
+      "filePath": "modules/nvim/files/lua/plugins/init.lua",
+      "contentHash": "4914eceb34939fd591824416dca0eeb4225be2c5944c189d44c48af3dc5f8cee",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 149,
+      "hasStructuralAnalysis": false
+    },
+    "modules/nvim/install.sh": {
+      "filePath": "modules/nvim/install.sh",
+      "contentHash": "db0d6bcf8b61b288f0f04299c1a2cadca19cdced5645a1403a861d4cfa6da13f",
+      "functions": [
+        {
+          "name": "_nvim_recent_enough",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "_nvim_bootstrap_lazy",
+          "params": [],
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "_nvim_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 53
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 97,
+      "hasStructuralAnalysis": true
+    },
+    "modules/nvim/meta.sh": {
+      "filePath": "modules/nvim/meta.sh",
+      "contentHash": "302acdf0e8b962ef98c84cc2477ff0d96b4ed7ffa5fed101d825c90de112e549",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 24,
+      "hasStructuralAnalysis": true
+    },
+    "modules/nvim/uninstall.sh": {
+      "filePath": "modules/nvim/uninstall.sh",
+      "contentHash": "b93b9b62be7f0b08bec7c476ee47b7e0a633e12c5d2c9f869dd7e0c6b06f205a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 5,
+      "hasStructuralAnalysis": true
+    },
+    "modules/tmux/files/.tmux.conf": {
+      "filePath": "modules/tmux/files/.tmux.conf",
+      "contentHash": "8c28db95f1778414f5044b2d9c3250956201fd150da3430cb0621f936d2fdcbe",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 133,
+      "hasStructuralAnalysis": false
+    },
+    "modules/tmux/install.sh": {
+      "filePath": "modules/tmux/install.sh",
+      "contentHash": "52aef445bdda108c51aa8139444ebad72cbb20c09107421f20a995e38804aa9c",
+      "functions": [
+        {
+          "name": "_tmux_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 36
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 66,
+      "hasStructuralAnalysis": true
+    },
+    "modules/tmux/meta.sh": {
+      "filePath": "modules/tmux/meta.sh",
+      "contentHash": "bae0328199f02f0858edcf8e3a723fcd4fb9f76170a9a79af0c22b6fc917dc3b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 34,
+      "hasStructuralAnalysis": true
+    },
+    "modules/tmux/uninstall.sh": {
+      "filePath": "modules/tmux/uninstall.sh",
+      "contentHash": "da69c74133079c95f53c418c2ccdfc25c0bdf0d2fbefddfdc5c2bf66415b004c",
+      "functions": [
+        {
+          "name": "_tmux_uninstall",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 19,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zoxide/install.sh": {
+      "filePath": "modules/zoxide/install.sh",
+      "contentHash": "bfd4ca7c6dabb2280e838abc3a8b0e475ce19ef2035d0116c688579c9398c49f",
+      "functions": [
+        {
+          "name": "_zoxide_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 32
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 42,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zoxide/meta.sh": {
+      "filePath": "modules/zoxide/meta.sh",
+      "contentHash": "4ebf1f4d323f4e36ccb8e4cb9802667a29c3650f49345d961ce613d532a10536",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 20,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zoxide/uninstall.sh": {
+      "filePath": "modules/zoxide/uninstall.sh",
+      "contentHash": "adf69b09106aaabf88550b03d8765fbd07cbdec8cb074e49c83741d46a3e7c91",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 11,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.fzf.zsh": {
+      "filePath": "modules/zsh/files/.fzf.zsh",
+      "contentHash": "1bee50838fe83fcb9c80d45701067300b657f38c248a3a9293b48791d57a2914",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 11,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.p10k.zsh": {
+      "filePath": "modules/zsh/files/.p10k.zsh",
+      "contentHash": "d91ee68c2dacd3f5549e3a2711a1bc56176751f3de2fb5b834bf6105ff9fcd8f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1721,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshenv": {
+      "filePath": "modules/zsh/files/.zshenv",
+      "contentHash": "eae4ae66744369d85c5a377eed360da4a9fdaf38c677bc73b9115d133268b858",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 24,
+      "hasStructuralAnalysis": false
+    },
+    "modules/zsh/files/.zshrc": {
+      "filePath": "modules/zsh/files/.zshrc",
+      "contentHash": "fc5fb82863bfdb936ef3df19e7e09099e7ed697ee222c8920db500a2dc3319e9",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 28,
+      "hasStructuralAnalysis": false
+    },
+    "modules/zsh/files/.zshrc.d/aliases.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/aliases.zsh",
+      "contentHash": "4fed8f1be06382656cfb9a67443b52b78d83074184ae596c701cc136699f9b3b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 60,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/core.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/core.zsh",
+      "contentHash": "885ec7b6f756cbdc6b879010aafb8e1ffd94942b8e5a176246ca1ac7c2787aee",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 54,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/env.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/env.zsh",
+      "contentHash": "5ce32454a68c1e2a8e3b24178814c8a4dac57646f5f64396262bd598b0027782",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/functions.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/functions.zsh",
+      "contentHash": "956171f7c33cde50890c571092eca9306dc6a01840d75f0629f98f39cce11ef4",
+      "functions": [
+        {
+          "name": "mkcd",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "extract",
+          "params": [],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "_update_terminal_size",
+          "params": [],
+          "exported": false,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 46,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/local.zsh.example": {
+      "filePath": "modules/zsh/files/.zshrc.d/local.zsh.example",
+      "contentHash": "a85a9674707415620eccede4dd3c8aae9a0f9e1280caba5084c7c1143d27cc88",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 23,
+      "hasStructuralAnalysis": false
+    },
+    "modules/zsh/files/.zshrc.d/nvm.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/nvm.zsh",
+      "contentHash": "dfbc9cebcbd23169e9a60701bf4aab2812b6b4337cd419a0b539a57c9d964f42",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/platform.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/platform.zsh",
+      "contentHash": "925ec876720975acc24b0bbbdcd7d17d06d957875156e3e09f3ae9b7383cfe63",
+      "functions": [
+        {
+          "name": "_detect_platform",
+          "params": [],
+          "exported": false,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 40,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/platform/docker.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/platform/docker.zsh",
+      "contentHash": "69bf3f4bc10e1ece006ed0b0e0e3bdb8c953b1ceabdc7e066b51af02d523b350",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 25,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/platform/linux.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/platform/linux.zsh",
+      "contentHash": "f92e057639e02954467d67f40e9df1bb44ad7ae0e4ed762430a37a4adc0c78ae",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 33,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/platform/macos.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/platform/macos.zsh",
+      "contentHash": "7c06adf6fedfe89b6bfeadd9f84d8ef5f6766f339eff4df27c036c4397dc50e0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 36,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/platform/wsl2.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/platform/wsl2.zsh",
+      "contentHash": "ca47282ddce528350eec0ecf55ce6f5f228b839acbebfdb34be5cd00f9686961",
+      "functions": [
+        {
+          "name": "win_user",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 59,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/files/.zshrc.d/tools.zsh": {
+      "filePath": "modules/zsh/files/.zshrc.d/tools.zsh",
+      "contentHash": "a01aeaece937557001b2e7f0e4fed045a0c97daf658d13de02399a71c2e64220",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 100,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/install.sh": {
+      "filePath": "modules/zsh/install.sh",
+      "contentHash": "f586557bdd1a993d5a26e9eb97bd2ac7b49acf4e5cf70128f4585a8b7c930294",
+      "functions": [
+        {
+          "name": "_zsh_install",
+          "params": [],
+          "exported": false,
+          "lineCount": 90
+        },
+        {
+          "name": "_zsh_make_default",
+          "params": [],
+          "exported": false,
+          "lineCount": 41
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 167,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/meta.sh": {
+      "filePath": "modules/zsh/meta.sh",
+      "contentHash": "ef7bfd2e67407577cb776a396e0ebdcc26d5ca8f8a1266f36daa5189ef93de68",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 38,
+      "hasStructuralAnalysis": true
+    },
+    "modules/zsh/uninstall.sh": {
+      "filePath": "modules/zsh/uninstall.sh",
+      "contentHash": "69bca4985ad193a622f4de30064fd0bf3e32ee2f267d8af10d3dba8b37680fef",
+      "functions": [
+        {
+          "name": "_zsh_uninstall",
+          "params": [],
+          "exported": false,
+          "lineCount": 23
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 39,
+      "hasStructuralAnalysis": true
+    },
+    "profiles/full.sh": {
+      "filePath": "profiles/full.sh",
+      "contentHash": "deb2a2fe9eb37c29b475739d2aafe36fe8bcea80cb3bcb044645e29294dee2e4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 6,
+      "hasStructuralAnalysis": true
+    },
+    "profiles/minimal.sh": {
+      "filePath": "profiles/minimal.sh",
+      "contentHash": "320f182a5cbf246118d266c057bee901fb18c06fd420468e1395de774d378bf3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 5,
+      "hasStructuralAnalysis": true
+    },
+    "profiles/standard.sh": {
+      "filePath": "profiles/standard.sh",
+      "contentHash": "a0a4fbe636ce3400f389a0e60a68e6e1c66da041940c00fe41897d62d41f68e0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/lint.sh": {
+      "filePath": "scripts/lint.sh",
+      "contentHash": "042f777d1218226e95b35ed1b8ba65bc78ee45b81065d5262f6b8c2a4714922b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/test.sh": {
+      "filePath": "scripts/test.sh",
+      "contentHash": "1f6f2cf0fa573fd77b41b0e02b58a81e5e2512492e483318c8962255276cf1fc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 20,
+      "hasStructuralAnalysis": true
+    },
+    "tests/integration/cli.bats": {
+      "filePath": "tests/integration/cli.bats",
+      "contentHash": "d54b4625ff92cd9807bcce046284124b52a23c7402199f5e4335299f0dfcfd56",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "tests/integration/doctor.bats": {
+      "filePath": "tests/integration/doctor.bats",
+      "contentHash": "7114d6a17370f74b1f43576cce2c445ce4810eb316ffe915f525d2d2324c60dd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 57,
+      "hasStructuralAnalysis": false
+    },
+    "tests/integration/dry-run.bats": {
+      "filePath": "tests/integration/dry-run.bats",
+      "contentHash": "fa437165f3c1ba4ac21011431027f49811c50273e191ac52affc7ba299297d64",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "tests/integration/profile-compose.bats": {
+      "filePath": "tests/integration/profile-compose.bats",
+      "contentHash": "b7bb4c146afc9f1f4f6c574c70db3cb138c41b34e6ec9255853b9106b7df23f1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 31,
+      "hasStructuralAnalysis": false
+    },
+    "tests/integration/smoke.sh": {
+      "filePath": "tests/integration/smoke.sh",
+      "contentHash": "6f184fab63045fe2349a30e1eee83b32cc485280d6bcb624d8c3b95dfc07b552",
+      "functions": [
+        {
+          "name": "cleanup",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "fail",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 40,
+      "hasStructuralAnalysis": true
+    },
+    "tests/test_helper.bash": {
+      "filePath": "tests/test_helper.bash",
+      "contentHash": "517b2be01d89730ef66d596122b6f9d169d51deb919002c2ed0626887d4dc0ee",
+      "functions": [
+        {
+          "name": "_envup_repo_root",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "common_setup",
+          "params": [],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "common_teardown",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "mk_module",
+          "params": [],
+          "exported": false,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 40,
+      "hasStructuralAnalysis": true
+    },
+    "tests/unit/block.bats": {
+      "filePath": "tests/unit/block.bats",
+      "contentHash": "af91a1f40d4a95037f82767dce2812c822ba8a229fc68aa529bdfaa4fb8f837e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 42,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/ghurl.bats": {
+      "filePath": "tests/unit/ghurl.bats",
+      "contentHash": "69340afd1fa8d1c7b057167cd0a2c84f0c31089d1de4e5deecb77bae46d86f80",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 24,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/link.bats": {
+      "filePath": "tests/unit/link.bats",
+      "contentHash": "1668043d6f12541633984481303d0ba99d85c252807a6242fe683a8b94d24c55",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/loglevel.bats": {
+      "filePath": "tests/unit/loglevel.bats",
+      "contentHash": "28182485296d2bb92462a24ecdc84e9a817d00a53b8094fd5835ac0bd4570b9d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 32,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/manifest.bats": {
+      "filePath": "tests/unit/manifest.bats",
+      "contentHash": "90ee28c01b340ca9220f1e6aa04f5fb65444eba0ff1b57e059d6cb2b3ca3955b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 56,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/meta.bats": {
+      "filePath": "tests/unit/meta.bats",
+      "contentHash": "96f992521f2ba226fa68147d7f77c6a07455fc8ff787b39275ef073e9a4f9d00",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 39,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/platform.bats": {
+      "filePath": "tests/unit/platform.bats",
+      "contentHash": "7241be18f771f1e17f78960f450ff18c4e8d377f6342ec06a6c4ed4731aed9f3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 40,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/resolve_order.bats": {
+      "filePath": "tests/unit/resolve_order.bats",
+      "contentHash": "807e27a0c0bb42db9cfd64214bb9ef295134b3f0e50e393435385fb7da8f7c1c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 50,
+      "hasStructuralAnalysis": false
+    },
+    "tests/unit/unlink.bats": {
+      "filePath": "tests/unit/unlink.bats",
+      "contentHash": "c5fe3b238dca1de6e94c5c7bdc7d343381a2ca4c7690c7c87a8bde54e8362e6b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 52,
+      "hasStructuralAnalysis": false
+    },
+    "VERSION": {
+      "filePath": "VERSION",
+      "contentHash": "4e56bf3224ce22dbc420c45139015269f74b70d0da7a86fbd40ef77c9a5be899",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": false
+    }
+  }
+}

@@ -1,0 +1,111 @@
+# Git configuration (shared across machines)
+# Linked into place by `envup install git`.
+#
+# Per-user identity (user.name / user.email) lives in ~/.gitconfig.local,
+# which is NOT in this repo. The [include] section at the bottom pulls it in.
+# `envup install git` will create that file for you on first install.
+
+[core]
+    editor = nvim
+    autocrlf = input
+
+# Delta configuration (only takes effect if delta is installed)
+# If delta is not installed, git uses default pager (less)
+# To enable: install delta, then uncomment [pager] section in ~/.gitconfig.local
+#
+# [pager]
+#     diff = delta
+#     log = delta
+#     reflog = delta
+#     show = delta
+
+[delta]
+    navigate = true
+    line-numbers = true
+    side-by-side = false
+    syntax-theme = Dracula
+    dark = true
+
+[interactive]
+    diffFilter = delta --color-only 2>/dev/null
+
+[init]
+    defaultBranch = main
+
+[pull]
+    rebase = true
+
+[push]
+    default = current
+    autoSetupRemote = true
+
+[fetch]
+    prune = true
+
+[merge]
+    tool = vimdiff
+    conflictstyle = diff3
+
+[diff]
+    tool = vimdiff
+    colorMoved = default
+
+[alias]
+    # Status
+    st = status -sb
+    s = status -sb
+    
+    # Log
+    lg = log --oneline --graph --decorate -20
+    lga = log --oneline --graph --decorate --all -20
+    ll = log --pretty=format:'%C(yellow)%h%Creset %s %C(green)(%cr)%Creset %C(blue)<%an>%Creset' -20
+    
+    # Branch
+    br = branch -vv
+    co = checkout
+    cb = checkout -b
+    
+    # Commit
+    cm = commit -m
+    ca = commit --amend
+    can = commit --amend --no-edit
+    
+    # Diff
+    df = diff
+    dfs = diff --staged
+    
+    # Reset
+    unstage = reset HEAD --
+    undo = reset --soft HEAD~1
+    
+    # Misc
+    alias = config --get-regexp ^alias\\.
+    last = log -1 HEAD --stat
+
+[color]
+    ui = auto
+    branch = auto
+    diff = auto
+    status = auto
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "status"]
+    added = green
+    changed = yellow
+    untracked = red
+
+# Trust any directory. Convenient inside Docker / shared hosts where the
+# repo is owned by a different uid than the running user, which would
+# otherwise trigger "dubious ownership". Per-user safe.directory entries
+# (more restrictive) belong in ~/.gitconfig.local.
+[safe]
+    directory = *
+
+# Per-user / per-machine overrides (NOT in this repo).
+# Anything here wins. Most importantly: [user] name/email.
+[include]
+    path = ~/.gitconfig.local

@@ -1,0 +1,37 @@
+# envup runtime state (manifest, logs) lives at $HOME/.local/state/envup/,
+# outside the repo — no .gitignore rule needed. See lib.sh:ENVUP_STATE_DIR.
+
+# User's local zsh overrides — NOT in git, per-machine
+modules/zsh/files/.zshrc.d/local.zsh
+
+# Editor / IDE droppings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# NOTE: modules/nvim/files/lazy-lock.json IS committed on purpose — it pins the
+# plugin set to one known-good snapshot that works on both nvim 0.10 (old-glibc
+# hosts) and 0.11 (containers). `envup install nvim` restores from it. Do not
+# gitignore it. Regenerate with ENVUP_NVIM_LAZY=sync envup install nvim.
+
+# Per-machine nvim overrides — written by user as ~/.config/nvim/local.lua,
+# which resolves to here because modules/nvim/files/ is symlinked to ~/.config/nvim.
+# Loaded by init.lua at the end via pcall so missing/typo files don't break startup.
+modules/nvim/files/local.lua
+
+# nvim plugin runtime logs (lazy.nvim, mason, etc. drop these in cwd when nvim
+# is launched from inside the repo, e.g. during development or `bash -n` checks).
+*.nvimlog
+
+# Understand-Anything knowledge graph: commit the graph itself (analyzed
+# baseline, reused by teammates) but never the local scratch dirs.
+.understand-anything/intermediate/
+.understand-anything/tmp/
+.understand-anything/.trash-*/
+.understand-anything/diff-overlay.json

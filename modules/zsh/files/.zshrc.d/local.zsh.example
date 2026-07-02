@@ -1,0 +1,22 @@
+# ============================================
+# Local Configuration (Example)
+# ============================================
+# Copy this file to local.zsh for per-machine overrides
+# This file is in .gitignore, so your changes won't be committed
+
+# Example: Set your timezone
+# export TZ="America/New_York"
+# export TZ="Asia/Shanghai"
+# export TZ="Europe/London"
+
+# Example: Override workspace path
+# export WORKSPACE="/my/custom/workspace"
+
+# Example: Add local aliases
+# alias myproject="cd ~/projects/myproject"
+
+# Example: Add local environment variables
+# export MY_API_KEY="xxx"
+
+# Example: Disable startup message
+# ENVUP_QUIET=1

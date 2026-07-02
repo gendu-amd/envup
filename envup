@@ -1,0 +1,382 @@
+#!/usr/bin/env bash
+# ============================================
+# envup — your dotfiles + dev tools on any machine, with one command.
+# ============================================
+# Thin CLI over lib.sh. A "module" is a directory under modules/<name>/ with:
+#   meta.sh        NAME / DESCRIPTION / DEPENDS / SELF_DEPS / CLEAN_PATHS
+#   install.sh     install hook (uses safe_link / pkg_install / log_* / ...)
+#   uninstall.sh   uninstall hook (uses unlink_safe / ...)
+#   files/         configs that get symlinked into $HOME
+# A "profile" is profiles/<name>.sh declaring MODULES=(...).
+#
+# Commands: install / uninstall / upgrade / status / clean / log.
+# Behaviour: configs are symlinks (edit in repo, git pull applies instantly);
+# a pre-existing real file at a link target is always backed up to
+# ~/.dotfiles_backup/<ts>/ before linking; uninstall only removes envup's own
+# symlinks. Honours ENVUP_DRY_RUN / --dry-run everywhere.
+# ============================================
+set -uo pipefail
+
+# macOS ships bash 3.2 at /bin/bash (licensing). envup needs bash >= 4. If the
+# current shell is too old, re-exec with Homebrew bash when installed — no PATH
+# surgery required as long as `brew install bash` has been run once.
+if [[ "$(uname -s)" == Darwin ]] && (( BASH_VERSINFO[0] < 4 )); then
+    _envup_bash=""
+    for _envup_bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        if [[ -x "$_envup_bash" ]] && "$_envup_bash" -c '(( BASH_VERSINFO[0] >= 4 ))'; then
+            exec "$_envup_bash" "$0" "$@"
+        fi
+    done
+    unset _envup_bash
+fi
+
+(( BASH_VERSINFO[0] >= 4 )) || {
+    echo "envup: bash >= 4 required (running $BASH_VERSION)." >&2
+    if [[ "$(uname -s)" == Darwin ]]; then
+        echo "  macOS: install once with 'brew install bash', then re-run ./envup" >&2
+        echo "  (envup auto-uses Homebrew bash; you do NOT need to change your login shell)" >&2
+    fi
+    exit 1
+}
+
+ENVUP_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; export ENVUP_HOME
+source "$ENVUP_HOME/lib.sh"
+export ENVUP_BACKUP_DIR
+
+# Version: prefer the committed VERSION file, fall back to git describe.
+envup_version() {
+    if [[ -r "$ENVUP_HOME/VERSION" ]]; then
+        cat "$ENVUP_HOME/VERSION"
+    else
+        ( cd "$ENVUP_HOME" && git describe --tags --always 2>/dev/null ) || echo unknown
+    fi
+}
+
+# One timestamped log file per command (reused if already open).
+log_init() {
+    [[ "${ENVUP_LOG_FILE:-/dev/null}" != /dev/null ]] && return 0
+    local dir="$HOME/.local/state/envup/logs"; mkdir -p "$dir"
+    ENVUP_LOG_FILE="$dir/$1_$(date +%Y%m%d_%H%M%S).log"; export ENVUP_LOG_FILE
+    log_info "log: $ENVUP_LOG_FILE"
+}
+
+# ---- install -------------------------------------------------------------
+cmd_install() {
+    local profile="" dry=0; local -a mods=()
+    while (($#)); do case "$1" in
+        -p|--profile) profile="${2:-}"; [[ -n "$profile" ]] || { log_error "--profile needs a name"; return 1; }; shift 2 ;;
+        -n|--dry-run) dry=1; shift ;;
+        -h|--help) cat <<EOF
+Usage: envup install [-p PROFILE] [-n] [MODULE...]
+  No args        install the 'standard' profile
+  -p PROFILE     install a profile (minimal / standard / full)
+  MODULE...      install specific modules (unioned with --profile)
+  -n, --dry-run  preview without changing anything
+EOF
+            return 0 ;;
+        -*) log_error "unknown option: $1"; return 1 ;;
+        *)  mods+=("$1"); shift ;;
+    esac; done
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
+    log_init install
+
+    local -a want=()
+    [[ -n "$profile" ]] && { load_profile "$profile" || return 1; want+=("${MODULES[@]}"); }
+    (( ${#mods[@]} )) && want+=("${mods[@]}")
+    (( ${#want[@]} )) || { load_profile standard || return 1; want=("${MODULES[@]}"); }
+
+    local m
+    for m in "${want[@]}"; do module_exists "$m" || { log_error "no such module: $m"; log_hint "see 'envup status'"; return 1; }; done
+
+    local -a order; mapfile -t order < <(resolve_order "${want[@]}")
+    log_info "install order: ${order[*]}"
+
+    # Install each selected module's declared SELF_DEPS that are missing, up
+    # front (so e.g. a fresh container has curl/git before an installer runs).
+    local -a deps=() d
+    for m in "${order[@]}"; do
+        for d in $(module_meta "$m" SELF_DEPS); do
+            [[ -n "$d" ]] || continue
+            pkg_have "$d" || deps+=("$d")
+        done
+    done
+    if (( ${#deps[@]} )); then
+        local -A s=(); local -a u=()
+        for d in "${deps[@]}"; do [[ -n "${s[$d]:-}" ]] || { s[$d]=1; u+=("$d"); }; done
+        log_info "installing prerequisites: ${u[*]}"
+        pkg_install "${u[@]}" || { log_error "failed to install prerequisites"; return 1; }
+    fi
+
+    local -a fail=()
+    for m in "${order[@]}"; do
+        if run_module_hook "$m" install; then [[ $dry == 1 ]] || manifest_add "$m"
+        else fail+=("$m"); fi
+    done
+
+    echo
+    if (( ${#fail[@]} )); then log_error "failed: ${fail[*]}"; log_hint "see log: $ENVUP_LOG_FILE"; return 1; fi
+    log_success "installed: ${order[*]}"
+    [[ -d "$ENVUP_BACKUP_DIR" ]] && log_info "backups: $ENVUP_BACKUP_DIR"
+    return 0   # don't let the [[ -d ]] test above become our exit status
+}
+
+# ---- uninstall -----------------------------------------------------------
+cmd_uninstall() {
+    local all=0 dry=0; local -a mods=()
+    while (($#)); do case "$1" in
+        --all) all=1; shift ;;
+        -n|--dry-run) dry=1; shift ;;
+        -h|--help) echo "Usage: envup uninstall [--all] [-n] MODULE..."; return 0 ;;
+        -*) log_error "unknown option: $1"; return 1 ;;
+        *)  mods+=("$1"); shift ;;
+    esac; done
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
+    log_init uninstall
+
+    (( all == 1 )) && mapfile -t mods < <(manifest_list)
+    (( ${#mods[@]} )) || { log_error "no modules given (use --all or list names)"; return 1; }
+
+    # Uninstall only the requested set (deps are NOT pulled in — removing atuin
+    # must not remove zsh).
+    local m fail=()
+    for m in "${mods[@]}"; do
+        module_exists "$m" || { log_warn "no such module: $m"; continue; }
+        if run_module_hook "$m" uninstall; then [[ $dry == 1 ]] || manifest_remove "$m"
+        else fail+=("$m"); fi
+    done
+    echo
+    (( ${#fail[@]} )) && { log_error "hook failed for: ${fail[*]}"; return 1; }
+    log_success "uninstall complete"
+}
+
+# ---- upgrade -------------------------------------------------------------
+cmd_upgrade() {
+    local dry=0 keep=0 ref=""; local -a fwd=()
+    while (($#)); do case "$1" in
+        -n|--dry-run) dry=1; shift ;;
+        -k|--keep-going) keep=1; shift ;;
+        -r|--ref) ref="${2:-}"; [[ -n "$ref" ]] || { log_error "--ref needs a tag or branch"; return 1; }; shift 2 ;;
+        -p|--profile) fwd+=(--profile "${2:-}"); shift 2 ;;
+        -h|--help) cat <<EOF
+Usage: envup upgrade [-n] [-k] [-r REF] [-p PROFILE] [MODULE...]
+  Update the source, then re-run install for everything in the manifest.
+  -r, --ref REF  check out a specific tag/branch (e.g. v0.1.0) instead of
+                 pulling the current branch — lets you pin/roll versions
+  -p PROFILE     also union a profile (picks up modules added to it)
+  -k             keep going even if the update step fails
+  -n             preview
+EOF
+            return 0 ;;
+        *) fwd+=("$1"); shift ;;
+    esac; done
+    log_init upgrade
+
+    local ok=1
+    if [[ $dry == 1 ]]; then
+        if [[ -n "$ref" ]]; then log_info "[dry-run] would: git fetch --tags && git checkout $ref (+submodules)"
+        else log_info "[dry-run] would: git pull --recurse-submodules"; fi
+    elif [[ -n "$ref" ]]; then
+        if ! ( cd "$ENVUP_HOME" \
+                && net_run "git fetch" -- git fetch --tags --recurse-submodules \
+                && git checkout "$ref" \
+                && git submodule update --init --recursive ); then
+            ok=0
+            log_error "checkout of '$ref' failed — source NOT updated"
+            log_hint "check: cd $ENVUP_HOME && git status; git tag"
+            [[ $keep == 1 ]] || { log_hint "use --keep-going to reinstall with the current source"; return 1; }
+        fi
+    elif ! ( cd "$ENVUP_HOME" && net_run "git pull" -- git pull --recurse-submodules ); then
+        ok=0
+        log_error "git pull failed — source NOT updated"
+        log_hint "check: cd $ENVUP_HOME && git status"
+        [[ $keep == 1 ]] || { log_hint "use --keep-going to reinstall with the current source"; return 1; }
+    fi
+
+    local -a inst=(); mapfile -t inst < <(manifest_list)
+    if (( ${#inst[@]} == 0 && ${#fwd[@]} == 0 )); then
+        log_info "nothing installed to upgrade"; return $(( 1 - ok ))
+    fi
+    [[ $dry == 1 ]] && fwd+=(--dry-run)
+
+    cmd_install "${fwd[@]}" "${inst[@]}"; local rc=$?
+    if (( ok == 0 )); then echo; log_error "REMINDER: git pull failed earlier — reinstalled OLD source"; return 1; fi
+    return $rc
+}
+
+# ---- status --------------------------------------------------------------
+# Minimal JSON string escaper (backslash + double-quote); our fields are simple.
+_json_escape() { local str="$1"; str="${str//\\/\\\\}"; str="${str//\"/\\\"}"; printf '%s' "$str"; }
+
+_status_json() {
+    local first=1 m p desc inst
+    printf '{"platform":"%s","arch":"%s","pkg":"%s","modules":[' \
+        "$ENVUP_PLATFORM" "$ENVUP_ARCH" "$ENVUP_PKG"
+    for m in $(modules_available); do
+        manifest_has "$m" && inst=true || inst=false
+        desc="$(_json_escape "$(module_meta "$m" DESCRIPTION)")"
+        (( first )) || printf ','; first=0
+        printf '{"name":"%s","description":"%s","installed":%s}' "$m" "$desc" "$inst"
+    done
+    printf '],"profiles":['
+    first=1
+    for p in $(profiles_available); do (( first )) || printf ','; first=0; printf '"%s"' "$p"; done
+    printf ']}\n'
+}
+
+cmd_status() {
+    case "${1:-}" in
+        -h|--help) echo "Usage: envup status [--json]"; return 0 ;;
+        --json)    _status_json; return 0 ;;
+    esac
+    log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG"
+    echo; echo "Modules:"
+    local m
+    for m in $(modules_available); do
+        if manifest_has "$m"; then
+            printf '  %s✓%s %-8s %s%s%s\n' "$C_GRN" "$C_NC" "$m" "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC"
+        else
+            printf '  ○ %-8s %s%s%s\n' "$m" "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC"
+        fi
+    done
+    echo; echo "Profiles:"
+    local p; for p in $(profiles_available); do echo "  - $p"; done
+}
+
+# ---- clean ---------------------------------------------------------------
+cmd_clean() {
+    local dry=0 m; local -a tgt=()
+    while (($#)); do case "$1" in
+        -n|--dry-run) dry=1; shift ;;
+        --all) tgt=(); shift ;;
+        -h|--help) echo "Usage: envup clean [-n] [--all | MODULE...]"; return 0 ;;
+        --*) m="${1#--}"; if module_exists "$m"; then tgt+=("$m"); else log_error "no module: $m"; return 1; fi; shift ;;
+        *)   if module_exists "$1"; then tgt+=("$1"); else log_error "no module: $1"; return 1; fi; shift ;;
+    esac; done
+    (( ${#tgt[@]} )) || mapfile -t tgt < <(modules_available)
+    log_init clean
+
+    local m p g n=0
+    for m in "${tgt[@]}"; do
+        local -a paths=() got=()
+        mapfile -t paths < <(module_meta "$m" CLEAN_PATHS)
+        for p in "${paths[@]}"; do [[ -n "$p" ]] || continue; for g in $p; do [[ -e "$g" ]] && got+=("$g"); done; done
+        (( ${#got[@]} )) || continue
+        log_step "[$m] cleaning caches"
+        if [[ $dry == 1 ]]; then for g in "${got[@]}"; do log_info "[dry-run] rm -rf $g"; done
+        else rm -rf "${got[@]}"; log_success "[$m] cleared ${#got[@]} path(s)"; fi
+        n=$((n + 1))
+    done
+    echo; (( n )) || log_info "nothing to clean"
+}
+
+# ---- log -----------------------------------------------------------------
+cmd_log() {
+    local follow=0
+    [[ "${1:-}" == --tail || "${1:-}" == -f ]] && follow=1
+    local dir="$HOME/.local/state/envup/logs"
+    [[ -d "$dir" ]] || { log_info "no logs yet"; return 0; }
+    # ls -t is the pragmatic way to pick the newest log; names are our own
+    # timestamped files, so the non-alphanumeric caveat behind SC2012 doesn't apply.
+    local latest
+    # shellcheck disable=SC2012
+    latest=$(ls -1t "$dir" 2>/dev/null | head -1)
+    [[ -n "$latest" ]] || { log_info "no logs yet"; return 0; }
+    log_info "latest: $dir/$latest"
+    if [[ $follow == 1 ]]; then tail -f "$dir/$latest"; else cat "$dir/$latest"; fi
+}
+
+# ---- doctor --------------------------------------------------------------
+# Static validation of module authoring conventions — catches mistakes before
+# they bite at install time. Read-only; no logs, no writes.
+_doctor_module() {   # returns count of issues found for module $1 (on stdout)
+    local m="$1" dir="$ENVUP_HOME/modules/$1" n=0 f hook d p
+
+    [[ -n "$(module_meta "$m" NAME)" ]]        || { log_error "[$m] meta.sh: missing NAME"; n=$((n+1)); }
+    [[ -n "$(module_meta "$m" DESCRIPTION)" ]] || { log_error "[$m] meta.sh: missing DESCRIPTION"; n=$((n+1)); }
+
+    while IFS= read -r d; do
+        [[ -n "$d" ]] || continue
+        module_exists "$d" || { log_error "[$m] DEPENDS on missing module: $d"; n=$((n+1)); }
+    done < <(module_meta "$m" DEPENDS)
+
+    for hook in install uninstall; do
+        f="$dir/$hook.sh"
+        [[ -f "$f" ]] || { log_warn "[$m] no $hook.sh"; continue; }
+        bash -n "$f" 2>/dev/null || { log_error "[$m] $hook.sh: syntax error"; n=$((n+1)); }
+        # Hooks run in a non-function subshell; a top-level (unindented) `local`
+        # would abort with "local: can only be used in a function".
+        if grep -Eq '^local[[:space:]]' "$f"; then
+            log_error "[$m] $hook.sh: top-level 'local' — wrap the hook body in a function"; n=$((n+1))
+        fi
+    done
+
+    while IFS= read -r p; do
+        case "$p" in
+            *".local/share/atuin"*|*".local/share/zoxide"*|*resurrect*|*".atuin"*|*".zsh_history"*|*".bash_history"*)
+                log_error "[$m] CLEAN_PATHS includes user data (clean must never delete it): $p"; n=$((n+1)) ;;
+        esac
+    done < <(module_meta "$m" CLEAN_PATHS)
+
+    echo "$n"
+}
+
+cmd_doctor() {
+    local only=""
+    case "${1:-}" in
+        -h|--help) echo "Usage: envup doctor [--module NAME]"; return 0 ;;
+        --module)  only="${2:-}"; [[ -n "$only" ]] || { log_error "--module needs a name"; return 1; } ;;
+    esac
+
+    local -a mods
+    if [[ -n "$only" ]]; then
+        module_exists "$only" || { log_error "no such module: $only"; return 1; }
+        mods=("$only")
+    else
+        mapfile -t mods < <(modules_available)
+    fi
+
+    local total=0 m one
+    for m in "${mods[@]}"; do
+        one="$(_doctor_module "$m")"
+        total=$((total + one))
+    done
+
+    echo
+    if (( total )); then
+        log_error "doctor: $total issue(s) found"
+        return 1
+    fi
+    log_success "doctor: all modules OK (${#mods[@]} checked)"
+}
+
+# ---- dispatch ------------------------------------------------------------
+usage() {
+    cat <<EOF
+envup — your dev environment on any machine
+
+Usage: envup <command> [options]
+  install    [-p PROFILE] [-n] [MODULE...]   Install profile / modules
+  uninstall  [--all] [-n] MODULE...          Remove module symlinks
+  upgrade    [-n] [-k] [-p PROFILE]          git pull + reinstall
+  status                                     Show what's installed
+  clean      [--all | MODULE...]             Clear caches declared in meta.sh
+  log        [--tail]                        Show the latest command log
+  doctor     [--module NAME]                 Validate module authoring conventions
+  version    (--version, -V)                  Print the envup version
+
+Run 'envup <command> --help' for command options.
+EOF
+}
+
+case "${1:-}" in
+    install)        shift; cmd_install   "$@" ;;
+    uninstall)      shift; cmd_uninstall "$@" ;;
+    upgrade)        shift; cmd_upgrade   "$@" ;;
+    status)         shift; cmd_status    "$@" ;;
+    clean)          shift; cmd_clean     "$@" ;;
+    log)            shift; cmd_log       "$@" ;;
+    doctor)         shift; cmd_doctor    "$@" ;;
+    version|--version|-V) echo "envup $(envup_version)" ;;
+    ""|-h|--help|help) usage ;;
+    *) log_error "unknown command: $1"; usage; exit 1 ;;
+esac
