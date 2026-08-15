@@ -19,7 +19,19 @@ done
 
 echo "==> shellcheck"
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -x "${files[@]}" || rc=1
+    # Module hooks do `source ./meta.sh` — relative, because run_module_hook
+    # cd's into the module dir first. shellcheck only resolves that with
+    # --source-path=SCRIPTDIR (0.7.0+). Older builds (e.g. the 0.6.0 in EL8)
+    # would report SC1091 on every hook, so pass the flag only when supported.
+    sc_opts=(-x)
+    if shellcheck --source-path=SCRIPTDIR --version >/dev/null 2>&1; then
+        sc_opts+=(--source-path=SCRIPTDIR)
+    else
+        echo "  note: shellcheck $(shellcheck --version | awk '/^version:/{print $2}') predates" \
+             "--source-path; sourced-file resolution is off (upgrade to >= 0.7.0)." >&2
+        sc_opts+=(-e SC1091)
+    fi
+    shellcheck "${sc_opts[@]}" "${files[@]}" || rc=1
 else
     echo "  shellcheck not found on PATH — install it to run static analysis." >&2
     rc=1
