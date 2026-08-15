@@ -1,60 +1,181 @@
 # envup architecture
 
-envup keeps your shell/editor/terminal setup consistent across machines. The
-whole tool is **two files** plus a directory of modules.
+envup keeps your shell/editor/terminal setup consistent across machines —
+including the ones where you have an account and nothing else.
 
 ```
-envup           # CLI: one cmd_* function per command + dispatch (~250 lines)
-lib.sh          # all shared helpers, sourced by the CLI and by module hooks
+envup                  # CLI: one cmd_* function per command + dispatch. A dispatcher.
+lib.sh                 # thin loader: sources lib/*.sh in dependency order
+lib/
+  log.sh               # logging + log levels
+  caps.sh              # capability detection: OS/distro/arch/libc/privilege/network
+  fs.sh                # _realpath, safe_link, unlink_safe, block_set/del
+  net.sh               # gh_url, net_run, net_fetch, net_clone, offline handling
+  pkg.sh               # package-manager abstraction + cross-distro package names
+  manifest.sh          # the manifest (schema 2: state/provider/version/time + repo root)
+  module.sh            # meta reading, dependency resolution, profiles
+  engine.sh            # the install engine: providers → links → hooks → verify
+  providers/
+    system.sh          # apt/dnf/yum/pacman/brew/apk
+    github_release.sh  # prebuilt binaries → ~/.local/bin      ← the no-root workhorse
+    git.sh             # clone a repo that carries its own installer
+    script.sh          # the vendor's official curl|sh installer
+    manual.sh          # print instructions, mark the module degraded
+  health.sh            # read-only inspection: what is actually true on disk
+  adopt.sh             # move third-party appends out of the tracked repo
+  authoring.sh         # static validation of module conventions
+  doctor.sh            # the machine health check
 modules/<name>/
-  meta.sh       # NAME / DESCRIPTION / DEPENDS / SELF_DEPS / CLEAN_PATHS
-  install.sh    # install hook  — calls safe_link / pkg_install / log_* / ...
-  uninstall.sh  # uninstall hook — calls unlink_safe / ...
-  files/        # configs that get symlinked into $HOME
-profiles/<name>.sh   # MODULES=(...)   — a named set of modules
+  meta.sh              # module contract v2 — pure data
+  hooks.sh             # optional: pre/post_install, pre/post_uninstall functions
+  files/               # configs that get symlinked into $HOME
+profiles/<name>.sh     # MODULES=(...) — a named set, composable via use_profile
 ```
 
-## How it works
+The load order in `lib.sh` is the dependency order, and it is also the shape of the
+program: detect what this machine can do → act on it → report on what happened.
 
-`envup install [profile|modules]` →
+## The module contract (v2)
 
-1. Resolve the module set (a profile's `MODULES`, and/or names on the CLI).
-2. `resolve_order` puts each module's `DEPENDS` before it (deduped).
-3. Install any missing `SELF_DEPS` (e.g. `curl`, `git`) up front.
-4. Run each module's `install.sh` in a subshell that inherits `lib.sh`'s
-   helpers. The hook symlinks its `files/` into `$HOME` via `safe_link`.
-5. Record the module in the manifest (`~/.local/state/envup/installed`).
+`meta.sh` is **data**. It is sourced, never executed for effect, and every field is
+read by `lib/engine.sh`:
 
-**Configs are symlinks**, not copies — edit the file in the repo (or
-`git pull` on another machine) and the change is live immediately, no reinstall.
+| Field | Meaning |
+|---|---|
+| `NAME` / `DESCRIPTION` | identity; `DESCRIPTION` is what `envup status` prints |
+| `DEPENDS=(...)` | other modules, installed first |
+| `PROVIDERS=(...)` | **ordered fallback chain** — the first one that can work here wins |
+| `GH_REPO` / `SCRIPT_URL` / `GIT_URL` / … | per-provider parameters |
+| `PKG_NAMES=("apt:fd-find" "brew:fd")` | package name per packaging family; `-` means "no such package here" |
+| `VERIFY_BIN` / `VERIFY_MIN_VERSION` | the success criterion. Unverified is not installed. |
+| `LINKS=("<repo path>:<target>")` | symlinks the engine creates; a leading `?` marks one as optional |
+| `APPLIES_IF` | a condition; false means the module is `skipped`, not failed |
+| `CLEAN_PATHS=(...)` | caches `envup clean` removes — never config, never user data |
 
-A few binary tools (fzf, zoxide, atuin) ship no config files: they're installed
-by their hook and wired into zsh via `.zshrc.d/tools.zsh`. nvim is the
-exception that needs reproducibility across nvim versions, so its plugin set is
-pinned by a committed `lazy-lock.json` and restored on install.
+`hooks.sh` is optional and holds **functions** (`post_install()` and friends). That
+it is functions rather than a bare script is not a style preference: hooks are
+sourced into a non-function subshell, where a top-level `local` is a syntax error.
+Wrapping them removes the entire class of bug.
 
-## Key guarantees (all in `lib.sh`)
+The engine drives everything else: pick a provider, install, link, run hooks, verify,
+record. A module with no custom steps needs no code at all.
 
-- **Backup, never clobber.** `safe_link` moves any pre-existing *real* file at
-  a link target into `~/.dotfiles_backup/<timestamp>/` before linking.
+### Four outcomes
+
+`ok` · `degraded` · `skipped` · `failed`. The distinction that matters is
+**degraded vs failed**: a tool that can't be installed on this machine (no root, no
+static release) still gets its config linked and starts working the moment someone
+installs the package. Only `failed` is a non-zero exit, and no single module's
+failure aborts the rest of the run.
+
+## Capabilities
+
+`lib/caps.sh` probes once and exports the result, so hooks in subshells reuse it:
+
+`ENVUP_OS` · `ENVUP_DISTRO` / `_VER` / `_LIKE` · `ENVUP_ARCH` (normalised, so
+`arm64` and `aarch64` don't produce two answers) · `ENVUP_LIBC` (`glibc-<ver>` or
+`musl`, which decides whether a prebuilt binary will even run) · `ENVUP_PRIV` ·
+`ENVUP_NET` · `ENVUP_HOST` · `ENVUP_HOME_SHARED`.
+
+Two of these carry most of the weight:
+
+- **`ENVUP_PRIV`** is `root` / `sudo` / `sudo-interactive` / `none`, and the probe is
+  `sudo -n true`. A `sudo` that exists but wants a password is **not** `sudo` —
+  treating it as such is how a non-interactive install used to block until the
+  900-second watchdog killed it.
+- **`ENVUP_NET`** is `direct` / `mirror` / `offline`, probed lazily via `caps_net()`.
+  Lazily, because a read-only command like `status` must not spend five seconds
+  reaching for GitHub to answer a local question. Never read the variable directly;
+  call `caps_net`.
+
+When a proxy is set, `priv_run` adds `sudo -E`. Without it `sudo`'s `env_reset`
+strips `http_proxy`, and `apt-get install` fails on every corporate network.
+
+## Networking
+
+Every outbound request goes through `lib/net.sh` — releases, clones, vendor scripts.
+That single choke point is what makes `ENVUP_GH_MIRROR` and `ENVUP_OFFLINE` work
+everywhere at once, and what makes timeouts universal. `envup doctor --authoring`
+rejects a module that reaches for `curl`/`wget`/`git clone` on its own, precisely so
+the choke point stays a choke point.
+
+## Key guarantees
+
+- **Backup, never clobber.** `safe_link` moves any pre-existing *real* file at a link
+  target into `~/.dotfiles_backup/<timestamp>/` before linking.
 - **Idempotent.** Re-running install is a no-op for already-correct symlinks.
-- **Reversible.** `unlink_safe` (and so `envup uninstall`) only removes
-  symlinks that point inside the repo — never your own files.
-- **Cross-platform.** `lib.sh` detects the platform and one of
-  apt/dnf/yum/pacman/brew/apk; `pkg_install` wraps it.
-- **No step can wedge the whole run.** `net_run` wraps git/curl with `timeout`,
-  `pkg_install` wraps the package manager, and `run_module_hook` puts an **outer
-  watchdog** (`ENVUP_MODULE_TIMEOUT`, default 900s, SIGTERM then SIGKILL) around
-  every hook. A module that hangs — stuck mirror, forgotten `net_run`, a step
-  waiting on stdin — is killed and reported failed; the sequential install then
-  moves on to the next module instead of hanging forever. (Requires a
-  `timeout`/`gtimeout` binary; without one envup warns and runs unguarded.)
-- **Dry-run.** `ENVUP_DRY_RUN=1` / `--dry-run` previews every change.
+- **Reversible.** `unlink_safe` only removes symlinks that point inside the repo.
+  Ownership is decided by comparing paths **both resolved and unresolved** — on a
+  home directory automounted as `/home` → `/mnt/home`, a resolved-only comparison
+  makes envup refuse to remove its own links.
+- **`_realpath`** falls back `readlink -f` → python3 → `cd -P && pwd -P`, so it is
+  correct on a macOS without coreutils.
+- **No step can wedge the whole run.** `net_run` wraps git/curl, `pkg_install` wraps
+  the package manager, and `run_module_hook` puts an outer watchdog
+  (`ENVUP_MODULE_TIMEOUT`, default 900s, SIGTERM then SIGKILL) around every hook.
+  Return codes 70/71/79 carry state through that watchdog — deliberately clear of
+  `timeout`'s own 124/137/143.
+- **Dry-run is total.** `ENVUP_DRY_RUN=1` / `--dry-run` previews every change,
+  including inside providers.
+
+## Observability
+
+`status` and `doctor` cannot disagree, because both read the same function:
+`health_probe` in `lib/health.sh` re-reads every symlink and re-runs every version
+check. The manifest records what envup *did*; health reports what is *true now*.
+
+`doctor` splits its findings in two, and the split decides the exit code:
+
+- an **issue** is something broken — a dangling link, an orphaned manifest entry.
+  Exit 1, and `--fix` can usually repair it.
+- a **note** is worth knowing but not wrong — a degraded module on a server without
+  root is the designed outcome. Exit 0.
+
+A tool that fails its exit code over things that are working as intended is a tool
+people stop running.
+
+`doctor --fix` runs a second, read-only pass afterwards and lets *that* decide the
+verdict: "I tried to fix it" is a weaker claim than "it is fixed".
+
+## The shell config model
+
+`~/.zshrc` sources numbered slices from `~/.zshrc.d/`, and the numbers *are* the
+design — the previous ordering bug (tools before platform) silently disabled every
+Homebrew-installed tool on macOS.
+
+| Slice | Responsibility |
+|---|---|
+| `00-guard` | p10k instant prompt, early guards |
+| `10-path` | PATH built via idempotent `path_prepend`/`path_append`; inherited PATH never reordered |
+| `20-platform` | OS detection + `platform/<os>.zsh` — **`brew shellenv`, ROCm/CUDA, WSL live here** |
+| `30-env` | locale / TZ / EDITOR — all conditional on what exists |
+| `40-shell` | Oh-My-Zsh, p10k, history, `compinit` (exactly once) |
+| `50-tools` | fzf / zoxide / atuin / direnv — **after** platform, so brew's tools are findable |
+| `55-node` | nvm as a lazy shim, not a 200–800ms startup cost |
+| `60-alias` / `65-func` | aliases and functions, conditional on the binary existing |
+| `70-host` | `hosts/<short-hostname>.zsh` — committed per-machine config |
+| `80-local` | `~/.zshrc.local` — private, outside the checkout, loads last |
+
+Three rules the slices follow:
+
+- **Never set what you can't verify.** `LC_ALL` is never set (it overrides every
+  `LC_*` category); `LANG` is set only to a locale `locale -a` actually lists;
+  `EDITOR` is the first of `nvim`/`vim`/`vi` that exists; `alias vim=nvim` is only
+  created if nvim is there. The old unconditional versions broke `git commit` and
+  `crontab -e` on any minimal server.
+- **Never reorder the inherited PATH.** Prepending the system directories demoted
+  brew, conda and HPC `module load` toolchains.
+- **Never swallow stderr.** A slice that fails prints which slice and why;
+  `ENVUP_ZSH_QUIET=1` restores the silence for a machine that needs it.
+
+The private layer lives in `$HOME`, not in the checkout: a gitignored file inside the
+repo can't sync, is shared by every machine on an NFS home, and puts anything writing
+to `~/.zshrc` inside version control. `envup adopt` cleans up after tools that did.
 
 ## Platform detection
 
-There are two detectors — one at install time (`lib.sh`, bash) and one at shell
-runtime (`modules/zsh/files/.zshrc.d/platform.zsh`, zsh). They can't share a
+There are two detectors — one at install time (`lib/caps.sh`, bash) and one at shell
+runtime (`modules/zsh/files/.zshrc.d/20-platform.zsh`, zsh). They can't share a
 function (different shells, and the zsh file is symlinked into `$HOME` with no
 knowledge of the repo), so they must implement the **same canonical rule**:
 
@@ -66,27 +187,18 @@ knowledge of the repo), so they must implement the **same canonical rule**:
 | Linux (otherwise) | `linux` |
 | anything else | `linux` (fallback) |
 
-`tests/unit/platform.bats` guards against drift (checks `lib.sh` against this
-rule and that `platform.zsh` uses the same discriminators). Change both together.
-
-## Mirrors / restricted networks
-
-`gh_url` (`lib.sh`) rewrites envup's own GitHub downloads through
-`ENVUP_GH_MIRROR` (a proxy prefix, e.g. `https://ghproxy.com`) when set;
-otherwise it returns URLs unchanged. `init.lua` honors the same variable for
-nvim's first-launch lazy.nvim bootstrap. Submodules use git's `insteadOf`.
+`tests/unit/platform.bats` guards against drift and asserts there are exactly two
+implementations. Change both together.
 
 ## Adding a module
 
-Create `modules/<name>/` with `meta.sh`, `install.sh`, `uninstall.sh`, and a
-`files/` dir. Use the helpers from `lib.sh` (`safe_link`, `pkg_install`,
-`log_*`). Add the name to a profile in `profiles/` (compose with `use_profile`).
-No change to `envup` or `lib.sh` is needed. Run `envup doctor` to validate the
-module follows the conventions (meta fields, function-wrapped hooks, safe
-`CLEAN_PATHS`).
+Create `modules/<name>/meta.sh` (data), optionally `hooks.sh` (functions), and a
+`files/` dir. Add the name to a profile. No change to `envup` or `lib/` is needed.
+Run `envup doctor --authoring` to validate it. Full walkthrough:
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Commands
 
-`install` · `uninstall` · `upgrade` (update + reinstall; `--ref` to pin a
-tag/branch) · `status` (`--json`) · `clean` (remove the `CLEAN_PATHS` a module
-declares) · `log` · `doctor` (validate modules) · `--version`.
+`install` · `uninstall` · `upgrade` (`--ref` to pin a tag/branch) · `status`
+(`--json`) · `doctor` (`--fix`, `--authoring`, `--module`) · `adopt` · `clean` ·
+`log` · `--version`.

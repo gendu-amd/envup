@@ -7,9 +7,12 @@ _envup() {
         'install:Install modules (by profile or by name)'
         'uninstall:Remove installed modules'
         'upgrade:Pull latest config and reinstall'
-        'status:Show installed modules and platform info'
+        'status:Show the real state of each module'
+        'doctor:Health-check this machine (--fix to repair)'
+        'adopt:Move third-party edits out of the repo'
         'clean:Clear caches declared in each module meta.sh'
         'log:Show the latest command log'
+        'version:Print the envup version'
         'help:Show usage'
     )
 
@@ -51,7 +54,25 @@ _envup() {
                         '--help[Show help]' \
                         '*:module:('"${_modules[*]}"')'
                     ;;
-                status) _arguments '--help[Show help]' ;;
+                doctor)
+                    _arguments \
+                        '--fix[Repair what can be repaired]' \
+                        '--authoring[Check module authoring conventions instead]' \
+                        '*--module[Restrict to one module]:module:('"${_modules[*]}"')' \
+                        '--help[Show help]' \
+                        '*:module:('"${_modules[*]}"')'
+                    ;;
+                adopt)
+                    # Only managed files can drift, so that is the whole candidate set.
+                    local -a _managed
+                    [[ -n "$_home" ]] && _managed=("$_home"/modules/*/files/**/*(N.))
+                    _managed=(${_managed#$_home/})
+                    _arguments \
+                        '--dry-run[Preview]' '-n[Preview]' \
+                        '--help[Show help]' \
+                        '*:path:('"${_managed[*]}"')'
+                    ;;
+                status) _arguments '--json[Machine-readable output]' '--help[Show help]' ;;
                 log)    _arguments '--tail[Follow live]' '-f[Follow live]' '--help[Show help]' ;;
             esac
             ;;

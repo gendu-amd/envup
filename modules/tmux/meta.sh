@@ -1,33 +1,33 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # metadata fields are consumed by module_meta() via sourcing
-# Module: tmux — TPM + session restore. Symlinks ~/.tmux.conf and plugins into
-# ~/.tmux/plugins/.
+# shellcheck disable=SC2034  # every field here is read by lib/engine.sh
+# Module: tmux — TPM + session restore.
+
 NAME="tmux"
 DESCRIPTION="Terminal multiplexer with TPM + session restore"
 DEPENDS=()
 
-# Tools install.sh needs to be on PATH before it can run.
-#   git — for `git submodule update --init` to fetch TPM + tmux plugins
-#         when the user clone'd without --recursive.
+# `git submodule update --init` fetches TPM and the plugins for anyone who
+# cloned without --recursive.
 SELF_DEPS=(git)
 
-# `envup clean tmux` is a no-op by design. Resurrect/continuum session
-# saves under ~/.local/share/tmux/resurrect/ are USER DATA (last layout
-# you were working in), not cache — destroying them defeats the point of
-# having session restore. If you really want a clean slate, delete that
-# directory by hand.
-CLEAN_PATHS=()
+VERIFY_BIN="tmux"
+# Like git: compiling tmux (and libevent, and ncurses) on a server you do not
+# own is not something envup should attempt. Package manager or a sentence.
+PROVIDERS=(system manual)
+MANUAL_HINT="ask an admin for the 'tmux' package — envup will link ~/.tmux.conf regardless"
 
-# Single source of truth for "what tmux plugins ship with this module" —
-# used by install.sh's submodule verify + symlink loop and uninstall.sh's
-# unlink loop. Defined here (in meta.sh) rather than in install.sh because
-# both install.sh and uninstall.sh are sourced into hook subshells that
-# already source meta.sh, so this is the only place visible to both.
-#
-# IMPORTANT: keep this in sync with the `set -g @plugin '...'` lines in
-# `modules/tmux/files/.tmux.conf`. The conf file is intentionally NOT
-# templated from this array — it's user-facing config, expected to be
-# editable + grep-able by humans, and the bash machinery to render it
-# would cost more than the once-in-a-blue-moon manual sync. When you
-# add/remove a plugin: edit BOTH this array AND .tmux.conf.
+# The plugins this module ships. Keep in sync with the `set -g @plugin '...'`
+# lines in files/.tmux.conf — the conf is user-facing config meant to be read
+# and edited by hand, so it is deliberately not generated from this array.
 TMUX_PLUGINS=(tpm tmux-sensible tmux-resurrect tmux-continuum vim-tmux-navigator)
+
+LINKS=("modules/tmux/files/.tmux.conf:$HOME/.tmux.conf")
+for _p in "${TMUX_PLUGINS[@]}"; do
+    LINKS+=("modules/tmux/files/plugins/$_p:$HOME/.tmux/plugins/$_p")
+done
+unset _p
+
+# Deliberately empty. resurrect/continuum saves under
+# ~/.local/share/tmux/resurrect/ are the layout you were last working in —
+# user data, not cache. Delete that directory by hand if you really mean it.
+CLEAN_PATHS=()

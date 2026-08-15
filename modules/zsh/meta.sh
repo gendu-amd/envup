@@ -1,33 +1,46 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # metadata fields are consumed by module_meta() via sourcing
-# Module: zsh
-# Modern shell with Oh-My-Zsh + Powerlevel10k.
+# shellcheck disable=SC2034  # every field here is read by lib/engine.sh
+# Module: zsh — the shell itself plus Oh-My-Zsh and Powerlevel10k.
 
 NAME="zsh"
 DESCRIPTION="Modern shell with Oh-My-Zsh + Powerlevel10k theme"
 DEPENDS=()
 
-# Tools install.sh needs to be on PATH before it can run.
-#   git  — for `git submodule update --init --recursive` to fetch p10k +
-#          plugins when the user clone'd without --recursive.
-#   curl — for the Oh-My-Zsh official installer (also has wget fallback,
-#          but curl is the documented one).
+#   git  — submodules for the theme and the plugins
+#   curl — the Oh-My-Zsh installer
 SELF_DEPS=(git curl)
 
-# Submodule plugins this module ships, as "name:omz-subdir" pairs. Single
-# source of truth shared by install.sh AND uninstall.sh (sourced by both) so
-# the two sides can never drift on which plugins exist — previously
-# uninstall.sh hardcoded the list and would leak a plugin if install gained
-# one. omz-subdir is the Oh-My-Zsh custom/ subdirectory: a prompt theme goes
-# in themes/, everything else in plugins/.
+VERIFY_BIN="zsh"
+# zsh needs compiling; there is no sane user-space binary route. On a server
+# without it and without root the module goes 'degraded': every config file is
+# linked and correct, and the shell works the moment the package appears.
+PROVIDERS=(system manual)
+MANUAL_HINT="ask an admin for the 'zsh' package — envup will link the config regardless"
+
+# Submodule plugins this module ships, as "name:omz-subdir". A prompt theme
+# goes in themes/, everything else in plugins/.
 ZSH_PLUGINS=(
     "powerlevel10k:themes"
     "zsh-autosuggestions:plugins"
     "zsh-syntax-highlighting:plugins"
 )
 
-# `envup clean zsh` resets shell startup caches. Safe to remove anytime;
-# they auto-rebuild on next zsh launch (first launch will be slower).
+LINKS=(
+    "modules/zsh/files/.zshenv:$HOME/.zshenv"
+    "modules/zsh/files/.zshrc:$HOME/.zshrc"
+    "modules/zsh/files/.zshrc.d:$HOME/.zshrc.d"
+    "modules/zsh/files/.p10k.zsh:$HOME/.p10k.zsh"
+    "modules/zsh/files/.fzf.zsh:$HOME/.fzf.zsh"
+    # envup itself on PATH, so `envup` and its completion work from anywhere.
+    # It rides with the zsh module because every non-trivial profile has zsh.
+    "envup:$HOME/.local/bin/envup"
+)
+for _e in "${ZSH_PLUGINS[@]}"; do
+    LINKS+=("modules/zsh/files/plugins/${_e%%:*}:$HOME/.oh-my-zsh/custom/${_e##*:}/${_e%%:*}")
+done
+unset _e
+
+# Startup caches. Safe to remove — they rebuild on the next zsh launch.
 CLEAN_PATHS=(
     "$HOME/.zcompdump"
     "$HOME/.zcompdump-"*

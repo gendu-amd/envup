@@ -1,56 +1,105 @@
 #!/usr/bin/env bats
-# WI-3.2: `envup doctor` catches module-authoring mistakes. Uses a fake repo
-# (symlinks to the real envup/lib.sh) with fixture modules so we can inject
-# broken ones without touching the real repo.
+# `envup doctor --authoring` catches module-authoring mistakes against the v2
+# contract: meta.sh is data, hooks.sh holds functions, and nothing downloads by
+# hand. Uses a fake repo (symlinks to the real envup/lib.sh) with fixture
+# modules so broken ones can be injected without touching the real repo.
+#
+# --authoring, because bare `envup doctor` now health-checks the *machine* —
+# see tests/unit/doctor.bats for that half.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     FAKE="$(mktemp -d "${BATS_TMPDIR:-/tmp}/envup-doc.XXXXXX")"
     ln -s "$REPO_ROOT/envup"   "$FAKE/envup"
     ln -s "$REPO_ROOT/lib.sh"  "$FAKE/lib.sh"
+    ln -s "$REPO_ROOT/lib"     "$FAKE/lib"
     ln -s "$REPO_ROOT/VERSION" "$FAKE/VERSION"
     mkdir -p "$FAKE/modules/good"
-    printf '#!/bin/bash\nNAME="good"\nDESCRIPTION="a good module"\n' > "$FAKE/modules/good/meta.sh"
-    printf '#!/bin/bash\n_i(){ local x=1; :; }\n_i\n' > "$FAKE/modules/good/install.sh"
-    printf '#!/bin/bash\n_u(){ :; }\n_u\n'            > "$FAKE/modules/good/uninstall.sh"
+    printf '#!/bin/bash\nNAME="good"\nDESCRIPTION="a good module"\nPROVIDERS=(system manual)\n' \
+        > "$FAKE/modules/good/meta.sh"
+    printf '#!/bin/bash\npost_install() { :; }\n' > "$FAKE/modules/good/hooks.sh"
 }
 teardown() {
     [[ -n "${FAKE:-}" && -d "$FAKE" ]] && rm -rf "$FAKE"
     return 0
 }
 
+_fixture() {   # _fixture <name> <meta.sh body>
+    mkdir -p "$FAKE/modules/$1"
+    printf '#!/bin/bash\nNAME="%s"\nDESCRIPTION="x"\n%s\n' "$1" "${2:-}" > "$FAKE/modules/$1/meta.sh"
+}
+
 @test "doctor: passes a well-formed module" {
-    run "$FAKE/envup" doctor --module good
+    run "$FAKE/envup" doctor --authoring --module good
     [ "$status" -eq 0 ]
 }
 
 @test "doctor: flags a missing DESCRIPTION" {
     mkdir -p "$FAKE/modules/nodesc"
     printf '#!/bin/bash\nNAME="nodesc"\n' > "$FAKE/modules/nodesc/meta.sh"
-    run "$FAKE/envup" doctor --module nodesc
+    run "$FAKE/envup" doctor --authoring --module nodesc
     [ "$status" -ne 0 ]
     [[ "$output" == *"missing DESCRIPTION"* ]]
 }
 
-@test "doctor: flags a top-level local in a hook" {
-    mkdir -p "$FAKE/modules/badlocal"
-    printf '#!/bin/bash\nNAME="badlocal"\nDESCRIPTION="x"\n' > "$FAKE/modules/badlocal/meta.sh"
-    printf '#!/bin/bash\nlocal oops=1\n' > "$FAKE/modules/badlocal/install.sh"
-    run "$FAKE/envup" doctor --module badlocal
+@test "doctor: flags a leftover install.sh from the v1 contract" {
+    # Nothing runs install.sh any more, so one left in a module is code that
+    # looks live and is not — the worst kind.
+    _fixture stale
+    printf '#!/bin/bash\n:\n' > "$FAKE/modules/stale/install.sh"
+    run "$FAKE/envup" doctor --authoring --module stale
     [ "$status" -ne 0 ]
-    [[ "$output" == *"top-level 'local'"* ]]
+    [[ "$output" == *"old contract"* ]]
+}
+
+@test "doctor: flags a hand-rolled download in a hook" {
+    # The mirror, the proxy, the offline check and the timeout all live in
+    # lib/net.sh; a bare curl in a module escapes every one of them.
+    _fixture rawcurl
+    printf '#!/bin/bash\npost_install() { curl -fsSL https://example.com/x | sh; }\n' \
+        > "$FAKE/modules/rawcurl/hooks.sh"
+    run "$FAKE/envup" doctor --authoring --module rawcurl
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"net_fetch"* ]]
+}
+
+@test "doctor: mentioning curl in a comment is not a finding" {
+    _fixture politecurl '#   curl — needed by the vendor installer'
+    run "$FAKE/envup" doctor --authoring --module politecurl
+    [ "$status" -eq 0 ]
+}
+
+@test "doctor: flags an install step run from meta.sh" {
+    _fixture actingmeta 'pkg_install something'
+    run "$FAKE/envup" doctor --authoring --module actingmeta
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"declarative"* ]]
+}
+
+@test "doctor: flags an unknown provider" {
+    _fixture badprov 'PROVIDERS=(system telepathy)'
+    run "$FAKE/envup" doctor --authoring --module badprov
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"unknown provider"* ]]
+}
+
+@test "doctor: flags a malformed LINKS entry" {
+    _fixture badlink 'LINKS=("modules/badlink/files/x")'
+    run "$FAKE/envup" doctor --authoring --module badlink
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"malformed LINKS"* ]]
 }
 
 @test "doctor: flags CLEAN_PATHS that point at user data" {
     mkdir -p "$FAKE/modules/baddata"
     printf '#!/bin/bash\nNAME="baddata"\nDESCRIPTION="x"\nCLEAN_PATHS=("$HOME/.local/share/atuin")\n' \
         > "$FAKE/modules/baddata/meta.sh"
-    run "$FAKE/envup" doctor --module baddata
+    run "$FAKE/envup" doctor --authoring --module baddata
     [ "$status" -ne 0 ]
     [[ "$output" == *"user data"* ]]
 }
 
 @test "doctor: the real repo passes clean" {
-    run "$REPO_ROOT/envup" doctor
+    run "$REPO_ROOT/envup" doctor --authoring
     [ "$status" -eq 0 ]
 }

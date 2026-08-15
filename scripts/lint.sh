@@ -8,7 +8,7 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 2
 
 shopt -s nullglob
-files=(envup lib.sh modules/*/*.sh profiles/*.sh scripts/*.sh tests/integration/*.sh)
+files=(envup lib.sh lib/*.sh modules/*/*.sh profiles/*.sh scripts/*.sh tests/integration/*.sh)
 
 rc=0
 
@@ -37,16 +37,19 @@ else
     rc=1
 fi
 
-# Soft guard (non-fatal): lib.sh is meant to stay small. Past the threshold,
-# consider splitting a section into lib/<name>.sh (see ARCHITECTURE).
-echo "==> lib.sh size"
-lib_lines=$(wc -l < lib.sh)
-lib_threshold=400
-if (( lib_lines > lib_threshold )); then
-    echo "  note: lib.sh is ${lib_lines} lines (> ${lib_threshold}); consider splitting a section." >&2
-else
-    echo "  lib.sh ${lib_lines}/${lib_threshold} lines"
-fi
+# Soft guard (non-fatal): each library file is one cohesive concern and is meant
+# to stay readable in a sitting. Past the threshold it is probably two concerns —
+# split it out as lib/<name>.sh and source it from lib.sh (see ARCHITECTURE).
+echo "==> library file sizes"
+lib_threshold=360
+for f in lib.sh lib/*.sh; do
+    n=$(wc -l < "$f")
+    if (( n > lib_threshold )); then
+        echo "  note: $f is ${n} lines (> ${lib_threshold}); consider splitting a section." >&2
+    else
+        printf '  %-16s %3d/%d lines\n' "$f" "$n" "$lib_threshold"
+    fi
+done
 
 if [[ $rc -eq 0 ]]; then
     echo "lint: OK"

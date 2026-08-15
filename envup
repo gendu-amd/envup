@@ -3,13 +3,14 @@
 # envup — your dotfiles + dev tools on any machine, with one command.
 # ============================================
 # Thin CLI over lib.sh. A "module" is a directory under modules/<name>/ with:
-#   meta.sh        NAME / DESCRIPTION / DEPENDS / SELF_DEPS / CLEAN_PATHS
-#   install.sh     install hook (uses safe_link / pkg_install / log_* / ...)
-#   uninstall.sh   uninstall hook (uses unlink_safe / ...)
+#   meta.sh        pure declarative data — what to install, verify, link, clean
+#   hooks.sh       optional functions (pre_install / post_install / ...) for the
+#                  steps no amount of data can express
 #   files/         configs that get symlinked into $HOME
+# lib/engine.sh drives all of it; nothing here knows how a module installs.
 # A "profile" is profiles/<name>.sh declaring MODULES=(...).
 #
-# Commands: install / uninstall / upgrade / status / clean / log.
+# Commands: install / uninstall / upgrade / status / doctor / adopt / clean / log.
 # Behaviour: configs are symlinks (edit in repo, git pull applies instantly);
 # a pre-existing real file at a link target is always backed up to
 # ~/.dotfiles_backup/<ts>/ before linking; uninstall only removes envup's own
@@ -104,20 +105,47 @@ EOF
         local -A s=(); local -a u=()
         for d in "${deps[@]}"; do [[ -n "${s[$d]:-}" ]] || { s[$d]=1; u+=("$d"); }; done
         log_info "installing prerequisites: ${u[*]}"
-        pkg_install "${u[@]}" || { log_error "failed to install prerequisites"; return 1; }
+        # Advisory, not fatal. These are conveniences the modules would like to
+        # have; the providers each check for what they actually need and pick a
+        # route accordingly. Aborting here is what used to make every profile
+        # uninstallable on a machine without root, even the modules that had a
+        # perfectly good user-space route.
+        pkg_install "${u[@]}" || log_warn "could not install prerequisites (${u[*]}) — modules will work around it"
     fi
 
-    local -a fail=()
+    # Four states, because "failed" was hiding two very different things: a
+    # module that could not be installed *here* (no root, no package, nothing
+    # to download) still lands its config and is fine, while a module whose
+    # install actually broke is not.
+    # The manifest row is written by the engine itself (lib/engine.sh), which is
+    # the only place that knows which provider worked and what version landed.
+    local -a good=() degraded=() skipped=() fail=()
+    local rc
     for m in "${order[@]}"; do
-        if run_module_hook "$m" install; then [[ $dry == 1 ]] || manifest_add "$m"
-        else fail+=("$m"); fi
+        run_module_hook "$m" install; rc=$?
+        case "$(engine_state_label "$rc")" in
+            ok)       good+=("$m") ;;
+            degraded) degraded+=("$m") ;;
+            skipped)  skipped+=("$m") ;;
+            *)        fail+=("$m") ;;
+        esac
     done
+    # Where the links were made from. doctor compares it against where envup is
+    # running from, and turns "twenty dangling symlinks" into "the repo moved".
+    [[ $dry == 1 ]] || manifest_set_root "$ENVUP_HOME"
 
     echo
-    if (( ${#fail[@]} )); then log_error "failed: ${fail[*]}"; log_hint "see log: $ENVUP_LOG_FILE"; return 1; fi
-    log_success "installed: ${order[*]}"
+    (( ${#good[@]} ))     && log_success "ok:       ${good[*]}"
+    (( ${#degraded[@]} )) && log_warn    "degraded: ${degraded[*]} (usable but incomplete — see above)"
+    (( ${#skipped[@]} ))  && log_info    "skipped:  ${skipped[*]} (not applicable to this machine)"
+    (( ${#fail[@]} ))     && log_error   "failed:   ${fail[*]}"
     [[ -d "$ENVUP_BACKUP_DIR" ]] && log_info "backups: $ENVUP_BACKUP_DIR"
-    return 0   # don't let the [[ -d ]] test above become our exit status
+
+    # Only a real failure is a failing exit status. 'degraded' is a correct,
+    # expected outcome on a locked-down server and scripts should not treat it
+    # as an error.
+    if (( ${#fail[@]} )); then log_hint "see log: $ENVUP_LOG_FILE"; return 1; fi
+    return 0
 }
 
 # ---- uninstall -----------------------------------------------------------
@@ -208,14 +236,25 @@ EOF
 _json_escape() { local str="$1"; str="${str//\\/\\\\}"; str="${str//\"/\\\"}"; printf '%s' "$str"; }
 
 _status_json() {
-    local first=1 m p desc inst
-    printf '{"platform":"%s","arch":"%s","pkg":"%s","modules":[' \
-        "$ENVUP_PLATFORM" "$ENVUP_ARCH" "$ENVUP_PKG"
+    local first=1 m p desc probe state tool inst nbroken
+    # net is whatever a previous command already probed: status is read-only and
+    # must not spend five seconds reaching for github to answer a local question.
+    printf '{"platform":"%s","arch":"%s","pkg":"%s","priv":"%s","net":"%s","modules":[' \
+        "$ENVUP_PLATFORM" "$ENVUP_ARCH" "$ENVUP_PKG" "$ENVUP_PRIV" "${ENVUP_NET:-unprobed}"
     for m in $(modules_available); do
-        manifest_has "$m" && inst=true || inst=false
+        probe="$(health_probe "$m")"
+        state="$(health_field "$probe" state)"
+        tool="$(health_field "$probe" tool)"
+        nbroken="$(health_records "$probe" link | grep -cEv '^(ok|skipped)	' || true)"
+        # An uninstalled module has no broken links, it has no links at all.
+        # Reporting nine of them invites a consumer to "repair" nothing.
+        [[ "$state" == absent ]] && { inst=false; nbroken=0; } || inst=true
         desc="$(_json_escape "$(module_meta "$m" DESCRIPTION)")"
         (( first )) || printf ','; first=0
-        printf '{"name":"%s","description":"%s","installed":%s}' "$m" "$desc" "$inst"
+        printf '{"name":"%s","description":"%s","installed":%s,"state":"%s","tool":"%s","provider":"%s","version":"%s","broken_links":%s}' \
+            "$m" "$desc" "$inst" "$state" "$tool" \
+            "$(_json_escape "$(manifest_get "$m" provider)")" \
+            "$(_json_escape "$(manifest_get "$m" version)")" "${nbroken:-0}"
     done
     printf '],"profiles":['
     first=1
@@ -223,36 +262,57 @@ _status_json() {
     printf ']}\n'
 }
 
+# Real state, not the manifest's memory of it. Deleting ~/.zshrc by hand used to
+# leave a green tick here for as long as the manifest line survived.
 cmd_status() {
     case "${1:-}" in
         -h|--help) echo "Usage: envup status [--json]"; return 0 ;;
         --json)    _status_json; return 0 ;;
     esac
-    log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG"
+    log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG  Priv: $ENVUP_PRIV"
     echo; echo "Modules:"
-    local m
+    local m probe state detail sym col
     for m in $(modules_available); do
-        if manifest_has "$m"; then
-            printf '  %s✓%s %-8s %s%s%s\n' "$C_GRN" "$C_NC" "$m" "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC"
-        else
-            printf '  ○ %-8s %s%s%s\n' "$m" "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC"
-        fi
+        probe="$(health_probe "$m")"
+        state="$(health_field "$probe" state)"
+        detail=""
+        case "$state" in
+            ok)       sym="✓"; col="$C_GRN" ;;
+            degraded) sym="~"; col="$C_YEL"
+                      detail="$(printf '%s\n' "$probe" | awk -F'\t' '$1=="tool"{print $3; exit}')" ;;
+            broken)   sym="!"; col="$C_RED"
+                      detail="$(health_records "$probe" link | grep -cEv '^(ok|skipped)	') broken link(s)" ;;
+            absent)   sym="○"; col="" ;;
+            *)        sym="?"; col="$C_RED"; detail="unreadable meta.sh" ;;
+        esac
+        printf '  %s%s%s %-8s %s%s%s%s\n' "$col" "$sym" "$C_NC" "$m" \
+            "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC" \
+            "${detail:+  — $detail}"
     done
+    echo "  ✓ ok   ~ degraded (config linked, tool missing)   ! broken   ○ not installed"
     echo; echo "Profiles:"
     local p; for p in $(profiles_available); do echo "  - $p"; done
 }
 
 # ---- clean ---------------------------------------------------------------
 cmd_clean() {
-    local dry=0 m; local -a tgt=()
+    local dry=0 all=0 m; local -a tgt=()
     while (($#)); do case "$1" in
         -n|--dry-run) dry=1; shift ;;
-        --all) tgt=(); shift ;;
+        --all) all=1; shift ;;
         -h|--help) echo "Usage: envup clean [-n] [--all | MODULE...]"; return 0 ;;
         --*) m="${1#--}"; if module_exists "$m"; then tgt+=("$m"); else log_error "no module: $m"; return 1; fi; shift ;;
         *)   if module_exists "$1"; then tgt+=("$1"); else log_error "no module: $1"; return 1; fi; shift ;;
     esac; done
-    (( ${#tgt[@]} )) || mapfile -t tgt < <(modules_available)
+    # --all used to be `tgt=()`, which cleared whatever had been parsed *before*
+    # it — so `clean nvim --all` and `clean --all nvim` did different things.
+    # Resolving after the loop makes the result independent of argument order.
+    if (( all )); then
+        (( ${#tgt[@]} )) && log_warn "--all overrides the module list (${tgt[*]})"
+        mapfile -t tgt < <(modules_available)
+    elif (( ${#tgt[@]} == 0 )); then
+        mapfile -t tgt < <(modules_available)
+    fi
     log_init clean
 
     local m p g n=0
@@ -285,69 +345,11 @@ cmd_log() {
     if [[ $follow == 1 ]]; then tail -f "$dir/$latest"; else cat "$dir/$latest"; fi
 }
 
-# ---- doctor --------------------------------------------------------------
-# Static validation of module authoring conventions — catches mistakes before
-# they bite at install time. Read-only; no logs, no writes.
-_doctor_module() {   # returns count of issues found for module $1 (on stdout)
-    local m="$1" dir="$ENVUP_HOME/modules/$1" n=0 f hook d p
-
-    [[ -n "$(module_meta "$m" NAME)" ]]        || { log_error "[$m] meta.sh: missing NAME"; n=$((n+1)); }
-    [[ -n "$(module_meta "$m" DESCRIPTION)" ]] || { log_error "[$m] meta.sh: missing DESCRIPTION"; n=$((n+1)); }
-
-    while IFS= read -r d; do
-        [[ -n "$d" ]] || continue
-        module_exists "$d" || { log_error "[$m] DEPENDS on missing module: $d"; n=$((n+1)); }
-    done < <(module_meta "$m" DEPENDS)
-
-    for hook in install uninstall; do
-        f="$dir/$hook.sh"
-        [[ -f "$f" ]] || { log_warn "[$m] no $hook.sh"; continue; }
-        bash -n "$f" 2>/dev/null || { log_error "[$m] $hook.sh: syntax error"; n=$((n+1)); }
-        # Hooks run in a non-function subshell; a top-level (unindented) `local`
-        # would abort with "local: can only be used in a function".
-        if grep -Eq '^local[[:space:]]' "$f"; then
-            log_error "[$m] $hook.sh: top-level 'local' — wrap the hook body in a function"; n=$((n+1))
-        fi
-    done
-
-    while IFS= read -r p; do
-        case "$p" in
-            *".local/share/atuin"*|*".local/share/zoxide"*|*resurrect*|*".atuin"*|*".zsh_history"*|*".bash_history"*)
-                log_error "[$m] CLEAN_PATHS includes user data (clean must never delete it): $p"; n=$((n+1)) ;;
-        esac
-    done < <(module_meta "$m" CLEAN_PATHS)
-
-    echo "$n"
-}
-
-cmd_doctor() {
-    local only=""
-    case "${1:-}" in
-        -h|--help) echo "Usage: envup doctor [--module NAME]"; return 0 ;;
-        --module)  only="${2:-}"; [[ -n "$only" ]] || { log_error "--module needs a name"; return 1; } ;;
-    esac
-
-    local -a mods
-    if [[ -n "$only" ]]; then
-        module_exists "$only" || { log_error "no such module: $only"; return 1; }
-        mods=("$only")
-    else
-        mapfile -t mods < <(modules_available)
-    fi
-
-    local total=0 m one
-    for m in "${mods[@]}"; do
-        one="$(_doctor_module "$m")"
-        total=$((total + one))
-    done
-
-    echo
-    if (( total )); then
-        log_error "doctor: $total issue(s) found"
-        return 1
-    fi
-    log_success "doctor: all modules OK (${#mods[@]} checked)"
-}
+# ---- doctor / adopt ------------------------------------------------------
+# Both live in lib/ (doctor.sh, adopt.sh): they are the largest single body of
+# logic envup has, and this file stays a dispatcher.
+cmd_doctor() { doctor_main "$@"; }
+cmd_adopt()  { adopt_main  "$@"; }
 
 # ---- dispatch ------------------------------------------------------------
 usage() {
@@ -358,10 +360,11 @@ Usage: envup <command> [options]
   install    [-p PROFILE] [-n] [MODULE...]   Install profile / modules
   uninstall  [--all] [-n] MODULE...          Remove module symlinks
   upgrade    [-n] [-k] [-p PROFILE]          git pull + reinstall
-  status                                     Show what's installed
+  status     [--json]                        Show the real state of each module
+  doctor     [--fix] [--authoring]           Health-check this machine
+  adopt      [-n] [PATH...]                  Move third-party edits out of the repo
   clean      [--all | MODULE...]             Clear caches declared in meta.sh
   log        [--tail]                        Show the latest command log
-  doctor     [--module NAME]                 Validate module authoring conventions
   version    (--version, -V)                  Print the envup version
 
 Run 'envup <command> --help' for command options.
@@ -376,6 +379,7 @@ case "${1:-}" in
     clean)          shift; cmd_clean     "$@" ;;
     log)            shift; cmd_log       "$@" ;;
     doctor)         shift; cmd_doctor    "$@" ;;
+    adopt)          shift; cmd_adopt     "$@" ;;
     version|--version|-V) echo "envup $(envup_version)" ;;
     ""|-h|--help|help) usage ;;
     *) log_error "unknown command: $1"; usage; exit 1 ;;

@@ -1,19 +1,26 @@
 #!/bin/bash
-# shellcheck disable=SC2034  # metadata fields are consumed by module_meta() via sourcing
-# Module: fzf — fuzzy finder. Installs the binary; no config symlinks (key
-# bindings load via the zsh module's .fzf.zsh).
+# shellcheck disable=SC2034  # every field here is read by lib/engine.sh
+# Module: fzf — fuzzy finder. Binary only; the key bindings load from the zsh
+# module's .fzf.zsh, which is why there is nothing to link here.
+
 NAME="fzf"
 DESCRIPTION="Fuzzy finder (Ctrl+T files, Ctrl+R history fallback)"
 DEPENDS=()
 
-# Tools install.sh needs to be on PATH before it can run.
-#   git  — official installer is a git clone (on apt/dnf/yum/apk distros;
-#          brew/pacman go through the system package manager instead).
-#   curl — handy for follow-up downloads; we keep it small.
-SELF_DEPS=(git)
+VERIFY_BIN="fzf"
 
-# fzf install is either ~/.fzf (git clone, owner-marker tracked by install.sh
-# so uninstall is safe) or a system package — nothing here qualifies as
-# "cache that can be safely nuked". The install/uninstall pair handles
-# its own filesystem state.
+# The git route is last because it is the expensive one (a clone plus a build
+# script) and it is only needed on a machine with no package and no matching
+# release asset.
+PROVIDERS=(system github_release git)
+GH_REPO="junegunn/fzf"
+GIT_URL="https://github.com/junegunn/fzf.git"
+GIT_DEST="$HOME/.fzf"
+
+# --no-update-rc is not optional: --all implies --update-rc, which appends
+# source lines to ~/.zshrc — a symlink into this repo — and dirties the
+# checkout on every install. envup loads fzf from the zsh module instead.
+GIT_SETUP="./install --key-bindings --completion --no-update-rc --no-bash --no-fish"
+
+LINKS=()
 CLEAN_PATHS=()

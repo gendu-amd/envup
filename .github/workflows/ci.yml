@@ -26,10 +26,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats
-        run: sudo apt-get update && sudo apt-get install -y bats
+      # zsh is a test dependency, not just a module: tests/unit/zshconfig.bats
+      # starts real interactive shells to assert the slice order, PATH dedup and
+      # conditional locale/EDITOR behaviour. Without zsh those tests skip, and a
+      # silently skipped suite is the same as no suite.
+      - name: Install bats + zsh
+        run: sudo apt-get update && sudo apt-get install -y bats zsh
       - name: Run unit tests
         run: bats tests/unit
+      - name: Fail if the zsh-config tests skipped
+        run: |
+          bats tests/unit/zshconfig.bats | tee /tmp/zsh.tap
+          ! grep -q '# skip' /tmp/zsh.tap
 
   integration:
     name: integration (dry-run + cli)
@@ -40,6 +48,61 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bats jq
       - name: Run integration tests
         run: bats tests/integration
+
+  no-root:
+    name: no-root install (unprivileged container)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      # The scenario envup 0.2 exists for: a server where you have an account
+      # and nothing else. No sudo, no package manager, no writing outside $HOME.
+      # Everything that ships as a static binary must still arrive (via the
+      # github_release provider, into ~/.local/bin); everything that needs a
+      # compiler must come back 'degraded' with its config linked — never
+      # 'failed', and never a prompt or a hang.
+      - name: install --profile standard as an unprivileged user
+        run: |
+          docker run --rm -v "$PWD:/src:ro" ubuntu:24.04 bash -eu -c '
+            apt-get update -qq && apt-get install -y -qq git zsh curl ca-certificates >/dev/null
+            useradd -m tester
+            cp -a /src /home/tester/envup && chown -R tester /home/tester/envup
+            su tester -c "
+              set -eu
+              cd /home/tester/envup
+              ./envup install --profile standard      # exit 0 unless something truly broke
+              ./envup status
+              ./envup doctor
+              test -x \$HOME/.local/bin/zoxide || { echo \"zoxide did not land in ~/.local/bin\"; exit 1; }
+              test -L \$HOME/.zshrc              || { echo \"~/.zshrc was not linked\"; exit 1; }
+            "
+          '
+
+  offline:
+    name: offline install (no network egress)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+      # ENVUP_OFFLINE=1 must make every network step decline *immediately*.
+      # The outer timeout is the actual assertion: the failure mode being
+      # guarded against is not a wrong answer, it is a 900s hang on a machine
+      # whose proxy silently blackholes connections.
+      - name: install --profile minimal with ENVUP_OFFLINE=1
+        env:
+          ENVUP_OFFLINE: "1"
+        run: |
+          export HOME="$(mktemp -d)"
+          timeout 180 ./envup install --profile minimal
+          timeout 60  ./envup status
+          # …and it declined rather than tried. 'offline:' is the decline
+          # message; 'Cloning into' would be git having actually gone out.
+          grep -rq 'offline:'     "$HOME/.local/state/envup/logs/"
+          ! grep -rq 'Cloning into' "$HOME/.local/state/envup/logs/"
 
   smoke-host:
     name: smoke (${{ matrix.os }})

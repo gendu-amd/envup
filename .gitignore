@@ -1,8 +1,15 @@
 # envup runtime state (manifest, logs) lives at $HOME/.local/state/envup/,
 # outside the repo — no .gitignore rule needed. See lib.sh:ENVUP_STATE_DIR.
 
-# User's local zsh overrides — NOT in git, per-machine
+# Personal zsh overrides now live at ~/.zshrc.local, outside the checkout —
+# a gitignored file *inside* the repo was a trap, because every tool that
+# appends to a dotfile was appending into version control. This rule only
+# covers the pre-0.2 location, for checkouts that still have one.
 modules/zsh/files/.zshrc.d/local.zsh
+
+# hosts/<hostname>.zsh is the opposite: per-machine config that IS committed,
+# so it survives a rebuild and reaches the other machines. Only the template
+# is shipped; your own host files are yours to add.
 
 # Editor / IDE droppings
 .vscode/

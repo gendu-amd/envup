@@ -1,0 +1,17 @@
+# envup — pinned upstream versions for the github_release provider.
+#
+#   <module>  <tag>          # anything after # is a comment
+#
+# A module listed here always gets that exact release; a module absent from the
+# file gets whatever is latest at install time. Pin when you want several
+# machines to agree — two servers set up a week apart otherwise end up on
+# different builds, and the difference surfaces later as a mystery.
+#
+# To pin: run `envup status` (or look at the install log) for the tag that was
+# actually used, add the line, commit it. To unpin: delete the line.
+#
+# module    tag
+fzf         v0.74.2
+zoxide      v0.10.0
+atuin       v18.19.0
+nvim        v0.12.4

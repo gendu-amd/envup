@@ -11,15 +11,27 @@
 
 A modular dotfiles manager that lets you set up your shell, editor, and CLI tools on any new machine with a single command. Pick a profile (minimal / standard / full) or install individual modules; uninstall anything you don't want; everything is logged and reversible.
 
+It is built for the machines you don't control: **no root**, a **corporate proxy**, a **home directory shared across a cluster**, macOS and Linux side by side. On any of them the answer is either "installed" or a specific reason why not — never a hang and never a half-configured shell.
+
 ## Requirements
 
 - **bash ≥ 4.0** (associative arrays for module dependency resolution). On **macOS**, `/bin/bash` is still 3.2 — run `brew install bash` once; `envup` auto-detects Homebrew's bash when you `./envup` (your login shell / tmux shell can stay zsh).
 - **git ≥ 2.0** (submodule rename support; almost certainly already installed)
 - **A POSIX system**: macOS, Linux (Ubuntu/Debian/Fedora/CentOS/Arch/Alpine), WSL2, or Docker
-- **A package manager**: apt / dnf / yum / pacman / brew / apk
-- **Network access** for first-time install (downloads zsh plugins, optional curl-installed tools like atuin/fzf)
-- **`sudo` available** if any system packages are missing (you'll see the prompt)
-- **Recommended**: `~/.local/bin` on `$PATH` so `envup` is globally accessible after install
+
+Everything below is **optional**:
+
+- **root / sudo** — without it envup skips the system package manager and installs
+  static binaries into `~/.local/bin` instead. Tools that need a compiler (`zsh`,
+  `git`, `tmux`) come back **degraded**: their config is linked and starts working
+  the moment an admin installs the package. Nothing prompts, nothing blocks.
+- **A package manager** (apt / dnf / yum / pacman / brew / apk) — used when it is
+  there and usable.
+- **Network access** — a first install without it lands every config file and
+  skips the downloads (`ENVUP_OFFLINE=1` to declare it up front).
+- **Recommended**: `~/.local/bin` on `$PATH` so `envup` and anything it installs
+  are reachable. The `zsh` module puts it there; `envup doctor` tells you if it
+  isn't.
 
 ## Quick Start
 
@@ -46,24 +58,41 @@ exec zsh
 
 ## What it looks like
 
+A server where you have an account and nothing else:
+
 ```console
 $ ./envup install --profile standard
 [i] install order: zsh git tmux fzf zoxide atuin
 ==> [zsh] install
 ✓ linked: ~/.zshrc
 ...
-✓ installed: zsh git tmux fzf zoxide atuin
+==> [zoxide] install
+[i] [zoxide] release v0.9.6: zoxide-x86_64-unknown-linux-musl.tar.gz
+✓ [zoxide] zoxide v0.9.6 installed to ~/.local/bin
+
+✓ ok:       zsh git fzf zoxide atuin
+⚠ degraded: tmux (usable but incomplete — see above)
 
 $ ./envup status
-[i] Platform: linux (x86_64)  PkgMgr: dnf
+[i] Platform: linux (x86_64)  PkgMgr: apt  Priv: none
 Modules:
   ✓ zsh      Modern shell with Oh-My-Zsh + Powerlevel10k theme
   ✓ git      Git config (~/.gitconfig with delta as pager)
+  ~ tmux     Terminal multiplexer with TPM + session restore  — tmux not found
   ○ nvim     Neovim editor with NvChad config + lazy.nvim plugins
-  ...
+  ✓ ok   ~ degraded (config linked, tool missing)   ! broken   ○ not installed
 
-$ ./envup status --json | jq '.modules[] | select(.installed)'
-{ "name": "zsh", "description": "Modern shell ...", "installed": true }
+$ ./envup doctor
+==> environment
+[i] os=linux distro=ubuntu-24.04 arch=x86_64 libc=glibc-2.39 priv=none pkg=apt net=direct
+==> modules
+✓ [zsh] ok (5.9)
+⚠ [tmux] degraded: tmux not found
+  → the config is linked — it starts working the moment the tool exists
+✓ doctor: this machine is healthy (1 note(s) above)
+
+$ ./envup status --json | jq '.modules[] | select(.state != "absent") | {name, state, provider}'
+{ "name": "zoxide", "state": "ok", "provider": "github_release" }
 ```
 
 > Prefer a recorded terminal cast? Generate one locally with
@@ -73,32 +102,95 @@ $ ./envup status --json | jq '.modules[] | select(.installed)'
 ## Commands
 
 ```bash
-./envup install [--profile NAME] [--dry-run] [MODULE...]                    # Install
-./envup uninstall [--all] [--dry-run] MODULE...                             # Remove
+./envup install [--profile NAME] [--dry-run] [MODULE...]                     # Install
+./envup uninstall [--all] [--dry-run] MODULE...                              # Remove
 ./envup upgrade [--profile NAME] [--ref TAG] [--dry-run] [--keep-going] ...  # update + reinstall
-./envup status [--json]                                                     # What's installed (✓ / ○)
-./envup clean [--dry-run] [--all | MODULE...]                               # Clear caches (meta CLEAN_PATHS)
-./envup log [--tail]                                                        # Most recent command's log
-./envup doctor [--module NAME]                                             # Validate module conventions
-./envup --version                                                          # Print the envup version
+./envup status [--json]                                                      # Real state of each module
+./envup doctor [--fix] [--authoring] [--module NAME]                         # Health-check this machine
+./envup adopt [--dry-run] [PATH...]                                          # Move third-party edits out of the repo
+./envup clean [--dry-run] [--all | MODULE...]                                # Clear caches (meta CLEAN_PATHS)
+./envup log [--tail]                                                         # Most recent command's log
+./envup --version                                                            # Print the envup version
 ```
 
 Use `./envup <command> --help` for command-specific options.
 
 A few important semantics that aren't obvious from the one-liners:
 
+- **Install has four outcomes, not two.** `ok` (installed and verified), `degraded` (config linked, the tool itself couldn't be installed here), `skipped` (not applicable to this machine), `failed` (actually broke). Only `failed` is a non-zero exit — a degraded module on a locked-down server is the designed outcome, and scripts shouldn't treat it as an error. **One module's failure never aborts the rest of the run.**
 - `install --profile X MODULE...` is a **UNION**, not OR — `envup install --profile minimal nvim` installs minimal's modules **and** nvim, deduped.
 - `upgrade` by default only reinstalls modules **already in your manifest** (`~/.local/state/envup/installed`). If your team added a new module to a profile, pass `--profile NAME` to pick it up.
-- `upgrade --ref v0.1.0` checks out a specific tag/branch (fetch + checkout + submodules) instead of pulling the current branch — use it to pin or roll to a released version.
-- `status --json` prints machine-readable state (platform, package manager, modules with `installed` flags, profiles) for scripting.
-- `ENVUP_LOG_LEVEL=debug|info|warn|error` (default `info`) controls terminal verbosity; the log file always records everything.
-- `ENVUP_GH_MIRROR=https://ghproxy.com` routes envup's own GitHub downloads (lazy.nvim, fzf, oh-my-zsh, zoxide installers, and nvim's first-launch bootstrap) through a mirror/proxy — handy on restricted networks. Unset = unchanged. For the git **submodules** (zsh/tmux plugins), use git's own redirect: `git config --global url."https://ghproxy.com/https://github.com/".insteadOf https://github.com/`.
-- `envup doctor` statically validates every module (meta fields, function-wrapped hooks, valid `DEPENDS`, and that `CLEAN_PATHS` never targets user data) — run it after adding a module.
+- `upgrade --ref v0.2.0` checks out a specific tag/branch (fetch + checkout + submodules) instead of pulling the current branch — use it to pin or roll to a released version.
+- `status` reports what is **actually true on disk right now** — it re-reads every symlink and re-runs every version check. `✓ ok` / `~ degraded` / `! broken` / `○ not installed`. Delete a config by hand and status says `!` on the next run.
+- `status --json` prints the same thing machine-readably (`state`, `tool`, `provider`, `version`, `broken_links` per module, plus platform / package manager / privilege level).
+- `doctor` health-checks **this machine**: every managed symlink, every tool version, the manifest, submodules, `~/.local/bin` on `PATH`, locale validity, and whether the repo has been moved. `--fix` repairs what can be repaired and then **re-checks**, so a clean exit means "it is fixed", not "I tried".
+- `doctor --authoring` is the other half: static validation of the modules in the repo (meta fields, function-wrapped hooks, valid `DEPENDS`, no hand-rolled downloads, `CLEAN_PATHS` that never targets user data). Run it after adding a module.
+- `adopt` handles the case where a third-party installer appended itself to one of your tracked config files. It moves those lines to `~/.zshrc.local` and restores the repo file. See [Configuration Sync](#configuration-sync).
 - **No step can hang the whole run:** network calls and the package manager are wrapped in timeouts, and each module hook runs under an outer watchdog (`ENVUP_MODULE_TIMEOUT`, default 900s). A stuck module is killed and reported failed; install continues with the rest. (Needs a `timeout`/`gtimeout` binary — on macOS: `brew install coreutils`.)
 - `upgrade --keep-going` lets the run continue even if `git pull` failed; otherwise upgrade aborts to avoid silently reinstalling stale config.
 - `upgrade --dry-run` skips `git pull` entirely and forwards `--dry-run` to install.
 - `clean` removes module-managed plugin caches (lazy.nvim, mason, oh-my-zsh, etc.) — NOT the binary, NOT your config. Useful when nvim Lazy state gets weird.
 - `log` shows the **most recent** command's log (install, uninstall, upgrade, or clean — whichever ran last).
+
+## Machines you don't control
+
+### No root
+
+There is no `sudo` prompt anywhere in envup. It probes with `sudo -n true` — if that
+doesn't pass without a password, the system package manager is simply off the table
+and the run continues down the other routes. (The probe matters: a `sudo` that sits
+waiting on a password in a non-interactive session is how installs used to hang for
+fifteen minutes before the watchdog killed them.)
+
+Each module declares an ordered fallback chain, and the engine picks the first one
+that can work here:
+
+| Provider | What it does | Needs root? |
+|---|---|---|
+| `system` | apt / dnf / yum / pacman / brew / apk | yes (except brew) |
+| `github_release` | download the matching prebuilt binary → `~/.local/bin` | no |
+| `git` | clone a repo that carries its own installer (fzf) | no |
+| `script` | the vendor's official `curl \| sh` installer | no |
+| `manual` | print instructions, mark the module `degraded` | — |
+
+`github_release` matches assets against the detected OS / arch / libc — including
+picking a **musl** build on a host whose glibc is too old — and pins versions in
+`versions.lock` so every machine gets the same binary.
+
+`zsh`, `git` and `tmux` need a compiler and have no static release to fetch. Without
+root and without the package, they end up `degraded`: **the config files are still
+linked**, and the tools start working the moment an admin installs the package. No
+reinstall needed.
+
+### Proxy, mirror, or no network at all
+
+```bash
+ENVUP_GH_MIRROR=https://ghproxy.com ./envup install    # route GitHub through a mirror
+ENVUP_OFFLINE=1 ./envup install --profile minimal      # don't even try; land the configs
+```
+
+Every outbound request in envup goes through one place (`lib/net.sh`), so those two
+variables cover all of it — releases, clones, and vendor install scripts alike. A
+module that reaches for `curl` on its own is a lint error, precisely so this stays
+true. `envup doctor --authoring` enforces it.
+
+`https_proxy` / `http_proxy` are preserved across privilege escalation (envup uses
+`sudo -E` when a proxy is set), which is what makes `apt-get install` work behind a
+corporate proxy at all.
+
+For the git **submodules** (zsh/tmux plugins), use git's own redirect:
+`git config --global url."https://ghproxy.com/https://github.com/".insteadOf https://github.com/`.
+
+### A home directory shared across machines
+
+Common on clusters with NFS/autofs mounts. Two things follow from it, and envup
+handles both:
+
+- Symlink ownership is decided by comparing paths both resolved and unresolved, so a
+  `/home` → `/mnt/home` automount doesn't make envup refuse to remove its own links.
+- Per-machine shell config goes in `~/.zshrc.d/hosts/<hostname>.zsh` (committed,
+  syncs, stays separate per machine) rather than in one shared "local" file. See
+  [Configuration Sync](#configuration-sync).
 
 ## Profiles
 
@@ -138,17 +230,34 @@ the CLI: `./envup install --profile standard nvim`.
 
 ## Modules
 
-Each module is a self-contained directory under [`modules/`](modules/) with three files:
+Each module is a self-contained directory under [`modules/`](modules/):
 
 ```
 modules/<name>/
-├── meta.sh          # Declares NAME, DESCRIPTION, DEPENDS=(...)
-├── install.sh       # Hook: install package + symlink configs
-├── uninstall.sh     # Hook: remove envup-managed symlinks
+├── meta.sh          # Pure data: what to install, how to verify, what to link
+├── hooks.sh         # Optional: pre/post_install, pre/post_uninstall functions
 └── files/           # Config files (symlinked to ~/)
 ```
 
-Adding a new tool = creating a new directory. No registry, no config update.
+`meta.sh` **declares**, it doesn't execute — the engine reads it and drives the
+install. A whole module can be a dozen lines with no logic at all:
+
+```bash
+NAME="zoxide"
+DESCRIPTION="Smarter cd — 'z <dir>' to jump, 'zi' to pick interactively"
+DEPENDS=(zsh)
+
+VERIFY_BIN="zoxide"                                   # how the engine knows it worked
+PROVIDERS=(system github_release script)              # ordered fallback chain
+GH_REPO="ajeetdsouza/zoxide"
+SCRIPT_URL="https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh"
+
+LINKS=()                                              # "<repo path>:<target>" pairs
+CLEAN_PATHS=()
+```
+
+Adding a new tool = creating a new directory. No registry, no config update. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the full contract.
 
 | Module | Tool | Depends |
 |--------|------|---------|
@@ -177,9 +286,14 @@ setting alone).
 ### nvim module
 
 The `nvim` module symlinks the NvChad config to `~/.config/nvim` and installs
-plugins. NvChad needs **nvim >= 0.10**; if your distro's nvim is older, the hook
-stops and prints upgrade options (envup never touches your system package
-sources):
+plugins. NvChad needs **nvim >= 0.10**, and the distro package is often older —
+Debian stable and RHEL both are. envup handles that itself: the engine sees the
+version shortfall, keeps walking the provider chain, and installs the official
+release build into `~/.local/bin` instead. envup never touches your system
+package sources.
+
+If even that isn't possible (no network, unusual architecture), the module
+degrades and prints your options:
 
 ```bash
 brew install neovim                          # macOS
@@ -203,20 +317,27 @@ install restores from the lock.
 ## How It Works
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ./envup install --profile standard                   │
-│         ↓                                           │
-│  load profiles/standard.sh → MODULES=(zsh git ...)  │
-│         ↓                                           │
-│  resolve order (each module's DEPENDS first)        │
-│         ↓                                           │
-│  for each module:                                   │
-│    source modules/<m>/install.sh                    │
-│    safe_link <repo files> → ~/                      │
-│    record in ~/.local/state/envup/installed           │
-│         ↓                                           │
-│  log to ~/.local/state/envup/logs/install_<ts>.log    │
-└─────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  ./envup install --profile standard                           │
+│         ↓                                                     │
+│  detect capabilities: OS, distro, arch, libc, privilege, net  │
+│         ↓                                                     │
+│  load profiles/standard.sh → MODULES=(zsh git ...)            │
+│         ↓                                                     │
+│  resolve order (each module's DEPENDS first)                  │
+│         ↓                                                     │
+│  for each module, the engine:                                 │
+│    reads meta.sh (data only)                                  │
+│    walks PROVIDERS until one works, given the capabilities    │
+│    symlinks LINKS into ~/ (backing up anything real)          │
+│    runs hooks.sh post_install, if present                     │
+│    verifies VERIFY_BIN / VERIFY_MIN_VERSION                   │
+│    records name + state + provider + version in the manifest  │
+│         ↓                                                     │
+│  ok / degraded / skipped / failed, per module, with reasons   │
+│         ↓                                                     │
+│  log to ~/.local/state/envup/logs/install_<ts>.log            │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 Key properties:
@@ -225,6 +346,7 @@ Key properties:
 - **Reversible**: Every overwritten file is backed up to `~/.dotfiles_backup/<timestamp>/`. `./envup uninstall` removes only envup-managed symlinks.
 - **Loggable**: Every command writes a timestamped log under `~/.local/state/envup/logs/`. Use `./envup log --tail` to follow live.
 - **Cross-platform**: macOS, Linux (apt/dnf/yum/pacman/brew/apk), WSL2, Docker. Auto-detects the platform and package manager.
+- **Degradable**: what can't be installed here is reported, not fatal — and the config lands either way.
 
 ## Environment Variables
 
@@ -233,8 +355,14 @@ envup recognises these env vars at install time. All are optional; defaults are 
 | Variable | Default | Effect |
 |---|---|---|
 | `ENVUP_DRY_RUN` | `0` | When `1`, every destructive step prints what it would do without changing anything. `--dry-run` sets this automatically. |
+| `ENVUP_OFFLINE` | `0` | When `1`, no network is attempted at all — downloads decline immediately instead of waiting for a timeout, and configs are still linked. |
+| `ENVUP_GH_MIRROR` | — | Prefix that all GitHub traffic is routed through, e.g. `https://ghproxy.com`. Covers releases, clones and vendor install scripts. |
+| `ENVUP_LOCAL_BIN` | `~/.local/bin` | Where root-free installs put binaries. |
+| `ENVUP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` — terminal verbosity. The log file always records everything. |
+| `ENVUP_MODULE_TIMEOUT` | `900` | Outer watchdog around each module hook. A hung module is killed and reported failed; the run continues. |
 | `ENVUP_NVIM_LAZY` | `restore` | `restore` installs the pinned versions from `lazy-lock.json`; `sync` updates to latest and rewrites the lock; `skip` leaves them for nvim's first launch. |
 | `ENVUP_ATUIN_INSTALL` | — | Set to `skip` to skip the atuin module (handy when its installer is blocked by a network/proxy). |
+| `ENVUP_ZSH_QUIET` | `0` | Shell-side: when `1`, a config slice that fails to load does so silently. Default is to print which slice broke and why. |
 | `ENVUP_NET_TIMEOUT` | `120` | Per-command timeout for git operations. Falls back gracefully when `timeout(1)` is unavailable (macOS: `brew install coreutils` for `gtimeout`). |
 | `ENVUP_NET_TIMEOUT_NVIM` | `600` | Larger timeout for `nvim --headless +Lazy!` (cloning 30+ plugins takes minutes). |
 | `ENVUP_NET_TIMEOUT_INSTALLER` | `300` | Timeout for `curl ... \| sh` installers (Oh-My-Zsh, atuin, zoxide). |
@@ -267,24 +395,41 @@ move it back from that directory.
 ls ~/.local/state/envup/logs/
 ```
 
-If something fails:
+**Start with `envup doctor`.** It checks the machine, names what is wrong, and
+`--fix` repairs most of it:
+
+```bash
+./envup doctor          # what's broken here?
+./envup doctor --fix    # repair, then re-check and report the real verdict
+```
+
+If something still fails:
 1. Check the log — every command's exit code, duration, and any stderr is captured.
 2. Re-run with `--dry-run` to see what would happen without doing anything.
-3. The hook script for the failing module is at `modules/<name>/install.sh` — read it, edit it locally, retry.
+3. `ENVUP_LOG_LEVEL=debug` shows the provider decisions (why this route and not that one).
+4. The module is at `modules/<name>/` — `meta.sh` is data, `hooks.sh` is the custom steps.
 
 ### Common issues
 
-**`./envup install` fails on a minimal docker image** — envup installs each selected module's declared `SELF_DEPS` (e.g. `curl`, `git`) up front. If that fails (e.g. apt repos blocked), install those packages manually then re-run.
+**Modules come back `degraded`** — that's a report, not a failure: the config is
+linked but the tool itself couldn't be installed here (usually no root and no static
+release to fall back on). `envup doctor` names the tool. Once someone installs the
+package it works with no reinstall.
 
-**zsh prompt is plain / Powerlevel10k missing** — you probably forgot `--recursive` when cloning. Fix:
+**zsh prompt is plain / Powerlevel10k missing** — you probably forgot `--recursive` when cloning. `envup doctor` reports this explicitly; fix:
 ```bash
-git submodule update --init --recursive
+git submodule update --init --recursive   # or: ./envup doctor --fix
 ./envup install zsh
 ```
 
-**`bash: warning: setlocale: cannot change locale (en_US.UTF-8)`** — envup runs `locale-gen` on apt systems automatically; if you see it persist, run `sudo locale-gen en_US.UTF-8` manually.
+**`setlocale: cannot change locale`** — envup 0.2 no longer forces a locale: it picks the first of `en_US.UTF-8` / `C.UTF-8` that the machine actually has, sets only `LANG`, and never sets `LC_ALL`. If you still see the warning, something else in your environment is setting it — `envup doctor` reports both cases.
 
-**`envup: command not found` after install** — the `zsh` module symlinks `envup` to `~/.local/bin/envup`. Make sure `~/.local/bin` is on `$PATH` (login again, or `exec zsh`).
+**`envup: command not found` after install** — the `zsh` module symlinks `envup` to `~/.local/bin/envup`. Make sure `~/.local/bin` is on `$PATH` (login again, or `exec zsh`). `envup doctor` flags it if it isn't.
+
+**Everything broke after moving the repo** — every symlink points at the old path. envup records where links were made from, so this is one message rather than twenty: `envup doctor --fix` relinks from the new location.
+
+**`envup upgrade` fails its `git pull` with local changes** — something appended to a
+tracked config file. See [Configuration Sync](#configuration-sync) and `envup adopt`.
 
 **`nvim too old` error** — NvChad needs nvim >= 0.10 and envup does NOT touch your APT sources. Upgrade via `brew install neovim`, `conda install -c conda-forge neovim` (best on old-glibc systems like RHEL/CentOS 8), or a source build, then re-run `envup install nvim`.
 
@@ -309,12 +454,47 @@ git pull                        # changes apply instantly (no reinstall)
 source ~/.zshrc
 ```
 
-For machine-specific settings that should NOT be synced, use the local-overrides file:
+### Per-machine settings
+
+There are two layers, and the difference is whether you want the setting to survive
+the machine being rebuilt:
 
 ```bash
-cp modules/zsh/files/.zshrc.d/local.zsh.example ~/.zshrc.d/local.zsh
-# Edit freely — gitignored, won't sync
+# Committed, syncs everywhere, keyed by hostname — proxies, CUDA prefixes,
+# `module load` lines, the timezone, machine-specific aliases.
+cp ~/.zshrc.d/hosts/example.zsh.template ~/.zshrc.d/hosts/$(hostname -s).zsh
+
+# Never committed, lives outside the repo, loads last so it wins — tokens,
+# one-off experiments.
+$EDITOR ~/.zshrc.local              # this home directory
+$EDITOR ~/.zshrc.local.$(hostname -s)   # this machine only
 ```
+
+The private layer deliberately lives in `$HOME`, **not** inside the repo checkout. A
+gitignored file inside the checkout is a trap: it can't sync, on a shared NFS home
+every machine gets the same one, and anything writing to `~/.zshrc` is writing into
+version control.
+
+### When something writes into your repo anyway
+
+Because `~/.zshrc` is a symlink into the checkout, a third-party installer that
+"helpfully" appends to it is appending to a tracked file — and the next
+`envup upgrade` fails its `git pull` on a different machine.
+
+`envup doctor` spots this, and `envup adopt` undoes it:
+
+```console
+$ envup doctor
+⚠ modules/zsh/files/.zshrc has lines appended after the last commit — a tool may have edited it
+  → move them out of the repo: envup adopt modules/zsh/files/.zshrc
+
+$ envup adopt
+✓ modules/zsh/files/.zshrc: appended lines moved to ~/.zshrc.local, file restored
+[i] adopted 1 file(s)
+```
+
+It only touches changes that are a **pure append** to a committed file. Anything you
+edited yourself is reported and left alone.
 
 ## Supported Platforms
 

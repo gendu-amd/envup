@@ -1,7 +1,8 @@
 # Contributing to envup
 
-envup is intentionally small: a CLI (`envup`), one shared library (`lib.sh`),
-and a directory of modules. Most contributions are **a new module**.
+envup is intentionally small: a CLI (`envup`) that dispatches, a library
+(`lib.sh` + `lib/`), and a directory of modules. Most contributions are
+**a new module** — and a module is usually pure data with no code at all.
 
 ## Add a module
 
@@ -9,72 +10,130 @@ Create `modules/<name>/`:
 
 ```
 modules/<name>/
-├── meta.sh        # metadata (all fields optional)
-├── install.sh     # install hook
-├── uninstall.sh   # uninstall hook
+├── meta.sh        # declarative metadata — the whole module, usually
+├── hooks.sh       # optional: custom steps, as functions
 └── files/         # configs to symlink into $HOME
 ```
 
-**`meta.sh`** — declare any of:
+### `meta.sh` — data, not code
+
+It is sourced for its variables and never executed for effect. The engine
+(`lib/engine.sh`) reads it and does the work.
 
 ```bash
 NAME="<short label>"
 DESCRIPTION="<one line, shown by 'envup status'>"
-DEPENDS=(<module>...)      # installed before this one
-SELF_DEPS=(<binary>...)    # system commands the install hook needs (curl, git)
-CLEAN_PATHS=(<path>...)    # caches 'envup clean <name>' removes (never config!)
+DEPENDS=(<module>...)          # other modules, installed before this one
+
+# --- how to install it, in order of preference ---------------------------
+PROVIDERS=(system github_release script)
+GH_REPO="owner/repo"           # for github_release
+SCRIPT_URL="https://..."       # for script
+GIT_URL="https://..."          # for git
+PKG_NAMES=("apt:fd-find" "dnf:fd-find")   # per packaging family; "-" = no such package
+PKG_DEFAULT="fd"               # fallback package name (defaults to $NAME)
+
+# --- how to know it worked ------------------------------------------------
+VERIFY_BIN="<binary>"          # unverified is not installed
+VERIFY_MIN_VERSION="0.9.0"     # optional
+
+# --- what to link ---------------------------------------------------------
+LINKS=("modules/<name>/files/.foorc:$HOME/.foorc")   # "?" prefix = optional source
+
+APPLIES_IF='...'               # shell condition; false ⇒ 'skipped', not 'failed'
+CLEAN_PATHS=(<path>...)        # caches 'envup clean <name>' removes (never config!)
 ```
 
-**`install.sh`** — runs in a subshell that already has every `lib.sh` helper.
-Use them instead of raw commands:
+Pick providers by how the tool is actually distributed:
+
+| Provider | Use when | Needs root? |
+|---|---|---|
+| `system` | the distro packages it | yes (brew excepted) |
+| `github_release` | it ships prebuilt binaries — **the route that works on a server without root** | no |
+| `git` | it's distributed as a checkout with its own installer (fzf) | no |
+| `script` | the vendor's official `curl \| sh` is the only route | no |
+| `manual` | it needs a compiler; print instructions and degrade | — |
+
+List them best-first. The engine walks the chain and takes the first one that
+can work given the detected privilege, network and architecture. A module whose
+tool can't be installed here ends up `degraded` — config linked, tool missing —
+which is a correct outcome, not a failure.
+
+### `hooks.sh` — only if there are custom steps
+
+Define **functions**: `pre_install`, `post_install`, `pre_uninstall`,
+`post_uninstall`. Functions rather than a bare script because hooks are sourced
+into a non-function subshell, where a top-level `local` is a syntax error.
+
+Every `lib/` helper is available. Use them instead of raw commands:
 
 | Helper | What it does |
 |--------|--------------|
-| `pkg_install <pkg>...` | install system packages (any of apt/dnf/yum/pacman/brew/apk) |
-| `pkg_have <cmd>` / `have <cmd>` | is a command on PATH? |
+| `pkg_install <pkg>...` | install system packages (apt/dnf/yum/pacman/brew/apk), honouring privilege detection |
+| `have <cmd>` | is a command on PATH? |
+| `bin_path <cmd>` / `bin_version <cmd>` | resolve a binary (including `~/.local/bin`) / read its version |
 | `safe_link <src> <dst>` | symlink `<src>` → `<dst>`, backing up any existing real file. `<src>` is relative to the repo root. |
 | `safe_link_optional <src> <dst>` | same, but skip silently if `<src>` is missing |
 | `unlink_safe <dst>` | remove a symlink **only if** it points into the repo |
-| `net_run "<desc>" -- <cmd>...` | run a network command with a timeout (`-k` SIGKILL backstop) |
+| `net_run "<desc>" -- <cmd>...` | run a network command with a timeout |
+| `net_fetch <url> [dst]` / `net_clone <url> <dst>` | download / clone through the mirror, proxy, offline check and timeout |
+| `gh_url <url>` | rewrite a GitHub URL through `ENVUP_GH_MIRROR` |
+| `priv_run <cmd>...` | run with elevated privilege **if** it's available without a password |
 | `block_set <file> <tag>` / `block_del <file> <tag>` | idempotently insert/remove a marker-delimited block in a file you append to but don't own (e.g. `~/.bashrc`); content on stdin |
 | `submodule_ensure <mod> <dir>...` | init git-submodule plugins + verify they're non-empty (zsh/tmux) |
 | `log_step/info/success/warn/error/hint "<msg>"` | logging |
 
-Every helper honours `ENVUP_DRY_RUN`, so a correct hook works under
-`--dry-run` for free. Example:
+Every helper honours `ENVUP_DRY_RUN`, so a correct hook works under `--dry-run`
+for free. Example:
 
 ```bash
-# modules/foo/install.sh
-pkg_have foo || pkg_install foo || return 1
-safe_link "modules/foo/files/.foorc" "$HOME/.foorc" || return 1
-log_success "foo installed"
+# modules/foo/hooks.sh
+post_install() {
+    [[ -d "$HOME/.config/foo" ]] || mkdir -p "$HOME/.config/foo"
+    log_success "foo configured"
+}
 ```
 
-**`uninstall.sh`** — undo the symlinks with `unlink_safe`. Don't remove the
-system package or user data.
+**Never call `curl`, `wget` or `git clone` directly.** They bypass the mirror,
+the proxy, the offline check and the timeout — `envup doctor --authoring`
+rejects them. Use `net_fetch` / `net_clone`.
 
 **Document the module.** Every module should be understandable at a glance:
 
 - `meta.sh` starts with a `# Module: <name> — <one-line purpose + notable side
   effects>` header, and sets a `DESCRIPTION` (shown by `envup status`).
-- `install.sh` / `uninstall.sh` open with a short comment on what they do and any
-  non-obvious decisions (e.g. why a step is guarded, what is deliberately kept).
+- `hooks.sh` opens with a short comment on what it does and any non-obvious
+  decisions (e.g. why a step is guarded, what is deliberately kept).
 - For anything richer (key bindings, cheatsheets), add `docs/<topic>.md` and link
   it from the README (see `docs/TMUX.md`).
 
 **Add it to a profile** in `profiles/<name>.sh` (`MODULES=(...)`). That's it —
-no change to `envup` or `lib.sh` is needed.
+no change to `envup` or `lib/` is needed.
 
 ## Conventions
 
 - A pre-existing real file at a link target is **always backed up** (never
   overwritten). Don't add prompts or overwrite logic.
-- If your hook uses `local`, wrap the body in a function (hooks are sourced
-  into a non-function subshell, where top-level `local` is illegal).
+- Uninstall removes envup's own symlinks. Don't remove the system package or
+  user data.
+- Nothing may block on input. No `sudo` prompt, no `read`. If a privilege isn't
+  available without a password, take another route or degrade.
+- `envup doctor --authoring` must pass. It catches leftover v1 `install.sh`
+  files, hand-rolled downloads, unknown providers, executable statements in
+  `meta.sh`, and `CLEAN_PATHS` that would delete user data.
 - Test with `--dry-run` against a throwaway `HOME`:
 
 ```bash
 HOME=$(mktemp -d) ./envup install <name> --dry-run
+```
+
+- Then test the paths that actually break. A no-root container is one command:
+
+```bash
+docker run --rm -v "$PWD:/src:ro" ubuntu:24.04 bash -c '
+  apt-get update -qq && apt-get install -y -qq git >/dev/null && useradd -m t &&
+  cp -a /src /home/t/envup && chown -R t /home/t/envup &&
+  su t -c "cd /home/t/envup && ./envup install <name> && ./envup doctor"'
 ```
 
 ## Tests & linting
@@ -90,15 +149,25 @@ scripts/test.sh    # bats unit + dry-run integration suites
 Requirements: [`shellcheck`](https://www.shellcheck.net/) and
 [`bats`](https://github.com/bats-core/bats-core) on `PATH`.
 
-- **Unit tests** (`tests/unit/`) cover `lib.sh` core logic: dependency
-  resolution, safe-linking/backup, manifest, and managed blocks. Add a case
-  when you change these.
+- **Unit tests** (`tests/unit/`) cover the library, one file per concern:
+  `caps` (privilege/network/arch detection), `engine` + `providers` (the install
+  contract), `realpath` / `link` / `unlink` (path ownership, including
+  symlinked-home cases), `manifest`, `health`, `doctor`, `adopt`, and
+  `zshconfig` (which starts real interactive zsh shells to assert slice order,
+  PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
+  change these.
 - **Integration** (`tests/integration/`): `dry-run.bats` asserts every profile
-  installs side-effect free; `smoke.sh` does a real install→status→uninstall of
-  the `git` module in a throwaway `HOME`.
-- Any behavior change must keep the six core invariants intact (backup /
-  idempotent / reversible / dry-run / dependency order / single source of truth)
-  — the unit suite guards them.
+  installs side-effect free; `doctor.bats` validates the authoring rules against
+  fixture modules; `smoke.sh` does a real install→status→uninstall of the `git`
+  module in a throwaway `HOME`.
+- CI additionally runs the two environments that used to break: an
+  **unprivileged container** (must install via `github_release` and degrade, not
+  fail) and an **offline** run (must decline immediately, not hang).
+- Any behavior change must keep the core invariants intact (backup / idempotent
+  / reversible / dry-run / dependency order / single source of truth / never
+  block on input) — the unit suite guards them.
+- `zsh` is a test dependency, not just a module. Without it `zshconfig.bats`
+  skips, and a silently skipped suite is the same as no suite.
 
 ## Releasing
 
