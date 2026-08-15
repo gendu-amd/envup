@@ -289,7 +289,7 @@ cmd_status() {
             "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC" \
             "${detail:+  — $detail}"
     done
-    echo "  ✓ ok   ~ degraded (config linked, tool missing)   ! broken   ○ not installed"
+    echo "  ✓ ok   ~ degraded (config linked, tool missing or unusable)   ! broken   ○ not installed"
     echo; echo "Profiles:"
     local p; for p in $(profiles_available); do echo "  - $p"; done
 }

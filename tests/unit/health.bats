@@ -114,6 +114,27 @@ VERIFY_MIN_VERSION="0.10.0"'
     [[ "$output" == *"0.9.5"* ]]
 }
 
+@test "health_probe: a binary that cannot run reads as broken, never as ok" {
+    # The real one: a prebuilt nvim wanting glibc 2.33 on a host with 2.32 dies
+    # on every call. health used to scrape the "GLIBC_2.33 not found" message
+    # for a dotted number, report version 2.33, and print a green tick for a
+    # tool that could not start.
+    stub_bin wontrun <<'EOF'
+#!/bin/bash
+echo "wontrun: /lib64/libc.so.6: version \`GLIBC_2.33' not found" >&2
+exit 1
+EOF
+    mk_meta wr 'VERIFY_BIN="wontrun"'
+    manifest_add wr
+    run health_probe wr
+    [[ "$output" == *$'tool\tbroken'* ]]
+    [[ "$output" != *$'tool\tok'* ]]
+    [[ "$output" != *"2.33"* ]]
+    # Config is still linked, so the module is degraded rather than broken —
+    # doctor is what escalates this one to an issue.
+    [[ "$output" == *$'state\tdegraded'* ]]
+}
+
 @test "health_probe: an optional link whose source was never checked out is not a fault" {
     mk_meta sub 'LINKS=("?files/never-cloned:$HOME/.sub")'
     manifest_add sub

@@ -50,6 +50,92 @@ mk_hooks() { printf '#!/bin/bash\n%s\n' "$2" > "$ENVUP_HOME/modules/$1/hooks.sh"
     version_ge 1.2.3 1.2.3
 }
 
+# ---- "installed" is not the same as "runs here" --------------------------
+# A binary can be on PATH, be +x, and still be unusable: the everyday cause is a
+# prebuilt release built against a newer glibc than the server has. It exits
+# non-zero with `version \`GLIBC_2.33' not found` — a message that happens to
+# contain a dotted number, which is how envup once reported nvim as "ok (2.33)".
+
+# A stub that behaves exactly like that failure.
+stub_wontrun() {
+    stub_bin "$1" <<EOF
+#!/bin/bash
+echo "$1: /lib64/libc.so.6: version \\\`GLIBC_2.33' not found" >&2
+exit 1
+EOF
+}
+
+@test "bin_version: a non-zero exit yields no version, not one scraped from the error" {
+    stub_wontrun brokenbin
+    VERIFY_VERSION_ARG="--version"
+    run bin_version brokenbin
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "bin_version: reads a banner printed on stderr, but only after a clean exit" {
+    stub_bin talksonstderr <<'EOF'
+#!/bin/bash
+echo "talksonstderr 4.5.6" >&2
+exit 0
+EOF
+    VERIFY_VERSION_ARG="--version"
+    run bin_version talksonstderr
+    [ "$status" -eq 0 ]
+    [ "$output" = "4.5.6" ]
+}
+
+@test "bin_version: prefers stdout when the tool writes to both" {
+    stub_bin bothstreams <<'EOF'
+#!/bin/bash
+echo "warning: config 9.9.9 is deprecated" >&2
+echo "bothstreams 1.2.3"
+EOF
+    VERIFY_VERSION_ARG="--version"
+    run bin_version bothstreams
+    [ "$output" = "1.2.3" ]
+}
+
+@test "bin_runs: separates 'not on PATH' from 'there but will not execute'" {
+    stub_wontrun deadbin
+    VERIFY_VERSION_ARG="--version"
+    ! bin_runs deadbin              # present, does not run
+    bin_path deadbin >/dev/null     # …and bin_path still finds it
+    ! bin_runs no-such-binary-anywhere
+}
+
+@test "engine_verify: an unrunnable binary is not installed, even with no version floor" {
+    # No VERIFY_MIN_VERSION is the common case (6 of 7 shipped modules). The old
+    # engine_verify returned early on bin_path alone, so those modules could
+    # never notice a broken binary at all.
+    stub_wontrun ghost
+    VERIFY_BIN=ghost; VERIFY_MIN_VERSION=""; VERIFY_VERSION_ARG="--version"
+    ! engine_verify
+}
+
+@test "engine_verify: VERIFY_VERSION_ARG covers a tool with no --version (tmux < 3.1)" {
+    # tmux before 3.1 answers -V and prints usage to stderr with exit 1 for
+    # anything else. Judging it by --version would call a working tmux broken.
+    stub_bin oldtmux <<'EOF'
+#!/bin/bash
+[[ "$1" == "-V" ]] && { echo "tmux 2.7"; exit 0; }
+echo "usage: tmux [-2CluvV]" >&2
+exit 1
+EOF
+    VERIFY_BIN=oldtmux; VERIFY_MIN_VERSION=""
+    VERIFY_VERSION_ARG="--version"; ! engine_verify
+    VERIFY_VERSION_ARG="-V";          engine_verify
+    run bin_version oldtmux
+    [ "$output" = "2.7" ]
+}
+
+@test "the shipped tmux module asks tmux on the flag tmux answers" {
+    # Guards the meta.sh field rather than the engine: without it, every tmux
+    # older than 3.1 reports 'broken' on an otherwise healthy machine.
+    run bash -c "source '$REPO_ROOT/modules/tmux/meta.sh' >/dev/null 2>&1; echo \$VERIFY_VERSION_ARG"
+    [ "$output" = "-V" ]
+}
+
 # ---- the four states -----------------------------------------------------
 
 @test "engine_install: a config-only module links its files and reports ok" {

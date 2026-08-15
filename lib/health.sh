@@ -43,7 +43,7 @@ health_link_state() {
 # health_probe <mod> — everything known about <mod> on this machine, as
 # tab-separated records:
 #
-#   tool<TAB><ok|old|missing|none><TAB><detail>
+#   tool<TAB><ok|old|broken|missing|none><TAB><detail>
 #   link<TAB><ok|broken|foreign|missing|skipped><TAB><dst><TAB><src>
 #   state<TAB><ok|degraded|broken|absent>
 #
@@ -58,10 +58,16 @@ health_probe() (
     if [[ -n "$VERIFY_BIN" ]]; then
         if engine_verify; then
             tool=ok; detail="$(bin_version "$VERIFY_BIN" 2>/dev/null || echo present)"
-        elif bin_path "$VERIFY_BIN" >/dev/null 2>&1; then
-            tool=old; detail="$(bin_version "$VERIFY_BIN" 2>/dev/null || echo unknown) < $VERIFY_MIN_VERSION"
-        else
+        elif ! bin_path "$VERIFY_BIN" >/dev/null 2>&1; then
             tool=missing; detail="$VERIFY_BIN not found"
+        elif ! bin_runs "$VERIFY_BIN"; then
+            # On PATH, executable, and still unusable — the shape of a prebuilt
+            # binary that wants a newer libc than this host has. Worth its own
+            # word: "missing" would send you looking for an install that already
+            # happened, and "ok" is what we used to say.
+            tool=broken; detail="$VERIFY_BIN is installed but will not run here"
+        else
+            tool=old; detail="$(bin_version "$VERIFY_BIN" 2>/dev/null || echo unknown) < $VERIFY_MIN_VERSION"
         fi
     fi
     printf 'tool\t%s\t%s\n' "$tool" "$detail"

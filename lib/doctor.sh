@@ -183,8 +183,17 @@ _doctor_modules() {
 
         case "$state" in
             ok)       log_success "[$m] ok${detail:+ ($detail)}" ;;
-            degraded) _doc_note   "[$m] degraded: ${detail:-the tool is not installed here}"
-                      log_hint "the config is linked — it starts working the moment the tool exists" ;;
+            degraded)
+                      # Not installed here is a designed outcome on a locked-down
+                      # box. Installed-but-unrunnable is not: something put a
+                      # binary on this machine that cannot execute on it.
+                      if [[ "$tool" == broken ]]; then
+                          _doc_issue "[$m] $detail"
+                          log_hint "[$m] let envup pick another route: envup install $m"
+                      else
+                          _doc_note "[$m] degraded: ${detail:-the tool is not installed here}"
+                          log_hint "the config is linked — it starts working the moment the tool exists"
+                      fi ;;
             broken)   log_error   "[$m] broken: ${#broken[@]} link(s) need attention" ;;
             absent)   log_info    "[$m] not installed" ;;
             *)        _doc_issue  "[$m] could not be read (meta.sh?)" ;;

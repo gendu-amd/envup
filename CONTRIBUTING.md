@@ -36,6 +36,7 @@ PKG_DEFAULT="fd"               # fallback package name (defaults to $NAME)
 # --- how to know it worked ------------------------------------------------
 VERIFY_BIN="<binary>"          # unverified is not installed
 VERIFY_MIN_VERSION="0.9.0"     # optional
+VERIFY_VERSION_ARG="-V"        # optional; default --version
 
 # --- what to link ---------------------------------------------------------
 LINKS=("modules/<name>/files/.foorc:$HOME/.foorc")   # "?" prefix = optional source
@@ -58,6 +59,13 @@ List them best-first. The engine walks the chain and takes the first one that
 can work given the detected privilege, network and architecture. A module whose
 tool can't be installed here ends up `degraded` — config linked, tool missing —
 which is a correct outcome, not a failure.
+
+The engine verifies by running `$VERIFY_BIN $VERIFY_VERSION_ARG` and checking the
+**exit status** — a binary that is present but won't execute (wrong libc, wrong
+arch) is not installed, and the chain keeps going. So `VERIFY_VERSION_ARG` has to
+be a flag the tool actually answers on: tmux before 3.1 prints usage and exits 1
+for `--version`, hence `VERIFY_VERSION_ARG="-V"`. If the tool has no version flag
+at all, define `verify()` in `hooks.sh` to replace the check wholesale.
 
 ### `hooks.sh` — only if there are custom steps
 

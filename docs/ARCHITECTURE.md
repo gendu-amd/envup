@@ -47,7 +47,7 @@ read by `lib/engine.sh`:
 | `PROVIDERS=(...)` | **ordered fallback chain** — the first one that can work here wins |
 | `GH_REPO` / `SCRIPT_URL` / `GIT_URL` / … | per-provider parameters |
 | `PKG_NAMES=("apt:fd-find" "brew:fd")` | package name per packaging family; `-` means "no such package here" |
-| `VERIFY_BIN` / `VERIFY_MIN_VERSION` | the success criterion. Unverified is not installed. |
+| `VERIFY_BIN` / `VERIFY_MIN_VERSION` / `VERIFY_VERSION_ARG` | the success criterion. Unverified is not installed. |
 | `LINKS=("<repo path>:<target>")` | symlinks the engine creates; a leading `?` marks one as optional |
 | `APPLIES_IF` | a condition; false means the module is `skipped`, not failed |
 | `CLEAN_PATHS=(...)` | caches `envup clean` removes — never config, never user data |
@@ -59,6 +59,16 @@ Wrapping them removes the entire class of bug.
 
 The engine drives everything else: pick a provider, install, link, run hooks, verify,
 record. A module with no custom steps needs no code at all.
+
+Verification asks the tool for its version and **reads the exit status**, not just
+the output. A binary can be on `PATH`, be executable, and still be unusable — a
+prebuilt release linked against a newer glibc than the host says ``version
+`GLIBC_2.33' not found`` and dies. That message contains a dotted number, so an
+output-only check reported nvim as `ok (2.33)` on a machine where nvim could not
+start. A tool that exits non-zero has no version; it is `broken`, the engine keeps
+walking the provider chain, and `doctor` raises an issue rather than a note. Tools
+that answer on another flag set `VERIFY_VERSION_ARG` (tmux before 3.1 knows only
+`-V`); anything stranger replaces the check with `verify()` in `hooks.sh`.
 
 ### Four outcomes
 

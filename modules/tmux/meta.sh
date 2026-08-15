@@ -11,6 +11,10 @@ DEPENDS=()
 SELF_DEPS=(git)
 
 VERIFY_BIN="tmux"
+# tmux before 3.1 has no --version, only -V: it prints a usage message and exits
+# non-zero. envup reads that exit code as "this binary does not run here", so the
+# flag has to be the one tmux actually answers on.
+VERIFY_VERSION_ARG="-V"
 # Like git: compiling tmux (and libevent, and ncurses) on a server you do not
 # own is not something envup should attempt. Package manager or a sentence.
 PROVIDERS=(system manual)

@@ -94,14 +94,35 @@ bin_path() {
     return 1
 }
 
-# bin_version <name> — first dotted number the tool prints. Deliberately loose:
-# every tool formats --version differently and we only ever compare it.
-bin_version() {
+# bin_runs <name> — does this binary actually execute on this machine? Being on
+# PATH and +x is not the same thing: a prebuilt binary linked against a newer
+# glibc than the host has gets installed happily and then dies on every call
+# with "version `GLIBC_2.33' not found". Asking it for its version is the
+# cheapest way to make it prove itself.
+bin_runs() {
     local p; p="$(bin_path "$1")" || return 1
-    local v
     # Unquoted on purpose: a module may need more than one word ("version -q").
     # shellcheck disable=SC2086
-    v="$("$p" ${VERIFY_VERSION_ARG:---version} 2>&1 | head -3 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    "$p" ${VERIFY_VERSION_ARG:---version} >/dev/null 2>&1
+}
+
+# bin_version <name> — first dotted number the tool prints. Deliberately loose
+# about the format (every tool differs and we only ever compare it), strict
+# about two things:
+#
+#   - a non-zero exit means no answer. Scraping the failure message above gave
+#     nvim a confident "2.33" and a green tick for a binary that cannot start.
+#   - stdout first. stderr is read only after a clean exit, for the few tools
+#     that print their banner there, so a warning can never become a version.
+bin_version() {
+    local p; p="$(bin_path "$1")" || return 1
+    local v out
+    # shellcheck disable=SC2086
+    out="$("$p" ${VERIFY_VERSION_ARG:---version} 2>/dev/null)" || return 1
+    v="$(printf '%s\n' "$out" | head -3 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    # shellcheck disable=SC2086
+    [[ -n "$v" ]] || v="$("$p" ${VERIFY_VERSION_ARG:---version} 2>&1 >/dev/null |
+        head -3 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
     [[ -n "$v" ]] || return 1
     printf '%s' "$v"
 }
@@ -118,6 +139,10 @@ engine_verify() {
     declare -F verify >/dev/null && { verify; return $?; }
     [[ -n "$VERIFY_BIN" ]] || return 0
     bin_path "$VERIFY_BIN" >/dev/null || return 1
+    # Present is not the same as working. A module whose tool has no --version
+    # (or answers on a flag envup cannot guess) sets VERIFY_VERSION_ARG, or
+    # replaces this check wholesale with verify() in hooks.sh.
+    bin_runs "$VERIFY_BIN" || return 1
     [[ -n "$VERIFY_MIN_VERSION" ]] || return 0
     local v; v="$(bin_version "$VERIFY_BIN")" || return 1
     version_ge "$v" "$VERIFY_MIN_VERSION"
@@ -152,12 +177,18 @@ _engine_tool() {
         return 0
     fi
 
-    # Present but too old reads very differently from absent, and conflating the
-    # two is how "nvim too old: " (with an empty version) used to happen.
+    # Present but too old, present but unrunnable, and absent all read very
+    # differently. Conflating the first two is how "nvim too old: " (with an
+    # empty version) used to happen.
     local had=""
-    if [[ -n "$VERIFY_MIN_VERSION" ]] && bin_path "$VERIFY_BIN" >/dev/null; then
-        had="$(bin_version "$VERIFY_BIN" || echo unknown)"
-        log_info "[$NAME] $VERIFY_BIN $had is older than the required $VERIFY_MIN_VERSION"
+    if bin_path "$VERIFY_BIN" >/dev/null; then
+        if ! bin_runs "$VERIFY_BIN"; then
+            log_warn "[$NAME] $VERIFY_BIN is installed but will not run here" \
+                     "(wrong libc or arch?) — looking for another route"
+        elif [[ -n "$VERIFY_MIN_VERSION" ]]; then
+            had="$(bin_version "$VERIFY_BIN" || echo unknown)"
+            log_info "[$NAME] $VERIFY_BIN $had is older than the required $VERIFY_MIN_VERSION"
+        fi
     fi
 
     if (( ${#PROVIDERS[@]} == 0 )); then

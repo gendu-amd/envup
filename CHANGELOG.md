@@ -101,6 +101,14 @@ the shell config model around those.
 - Findings are split into **issues** (broken, exit 1, fixable) and **notes**
   (working as designed, exit 0) — a degraded module on a locked-down server no
   longer fails the check.
+- **A tool only counts as installed if it runs.** Verification now checks the
+  binary's exit status instead of scraping whatever it printed: a prebuilt
+  release built against a newer glibc than the host prints ``version
+  `GLIBC_2.33' not found`` and dies, and envup used to read *2.33* out of that
+  message and report `ok`. Such a binary is now `broken` — a doctor issue with
+  a hint to let the engine try another provider — and version strings are read
+  from stdout, falling back to stderr only after a clean exit. Modules whose
+  tool answers on a different flag declare `VERIFY_VERSION_ARG` (tmux: `-V`).
 - **`envup status` reports what is true on disk**, re-reading every symlink and
   re-running every version check: `✓ ok` / `~ degraded` / `! broken` /
   `○ not installed`. It could previously show `✓` for a config you had deleted.
