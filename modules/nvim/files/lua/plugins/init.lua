@@ -1,7 +1,13 @@
 return {
   {
     "stevearc/conform.nvim",
-    -- event = 'BufWritePre', -- uncomment for format on save
+    -- Loaded on the first save (lazy.nvim replays the event afterwards) so
+    -- format_on_save in configs/conform.lua is actually reached, and on
+    -- :ConformInfo, which is how you find out why a formatter did nothing.
+    -- Formatters themselves are optional and skipped when missing — `:Mason`
+    -- installs clang-format / shfmt / ruff / prettier if the system has none.
+    event = "BufWritePre",
+    cmd = "ConformInfo",
     opts = require "configs.conform",
   },
 

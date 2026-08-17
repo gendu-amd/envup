@@ -72,6 +72,8 @@ require "configs.clipboard"
 -- Writes Session.vim while you work, so a tmux pane that a reboot took down
 -- comes back with your files in it. No-op outside tmux. See configs/session.lua.
 require("configs.session").setup()
+-- Keeps a 200 MB log from taking the editor down with it. See configs/bigfile.lua.
+require("configs.bigfile").setup()
 
 vim.schedule(function()
   require "mappings"
