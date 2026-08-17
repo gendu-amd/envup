@@ -188,9 +188,9 @@ handles both:
 
 - Symlink ownership is decided by comparing paths both resolved and unresolved, so a
   `/home` → `/mnt/home` automount doesn't make envup refuse to remove its own links.
-- Per-machine shell config goes in `~/.zshrc.d/hosts/<hostname>.zsh` (committed,
-  syncs, stays separate per machine) rather than in one shared "local" file. See
-  [Configuration Sync](#configuration-sync).
+- Per-machine config goes in a `hosts/<hostname>` file (committed, syncs, stays
+  separate per machine) rather than in one shared "local" file — for zsh, tmux,
+  nvim and git alike. See [Configuration Sync](#configuration-sync).
 
 ## Profiles
 
@@ -262,12 +262,29 @@ Adding a new tool = creating a new directory. No registry, no config update. See
 | Module | Tool | Depends |
 |--------|------|---------|
 | `zsh` | Modern shell with Oh-My-Zsh + Powerlevel10k (also makes zsh your default shell) | — |
-| `git` | Git config (with delta as pager) | — |
-| `tmux` | Terminal multiplexer (new panes use zsh) | — |
+| `git` | Git config (delta as pager where delta is installed) | — |
+| `tmux` | Terminal multiplexer (new panes use zsh, `prefix f` project switcher, OSC 52 clipboard) | — |
 | `fzf` | Fuzzy finder (Ctrl+T / Ctrl+R) | — |
 | `zoxide` | Smarter `cd` — `z <dir>` to jump, `zi` to pick | `zsh` |
 | `atuin` | SQLite-backed shell history | `zsh` |
 | `nvim` | Neovim with NvChad (plugins pinned via lazy-lock.json) | — |
+
+### Working on a remote box
+
+Two things the tmux module adds that only matter over SSH:
+
+**Copy lands on your laptop.** Yank in nvim or copy in tmux and the text goes to the
+clipboard of the machine you are sitting at, carried by the SSH connection you
+already have — no X11 forwarding, no root, no daemon. It needs one setting in your
+*local* terminal, which envup cannot set for you: see
+[docs/CLIPBOARD.md](docs/CLIPBOARD.md). (VS Code and Cursor ship it turned off.)
+
+**`prefix f` switches projects.** fzf over your project roots, then attach-or-create
+a tmux session named after the project — so picking one you already have open takes
+you back to it instead of opening a second copy. Also `ts` from the shell. Roots are
+`~/work/*`, `~/src/*`, `~/projects/*`, `~/dev/*`, `~/repos/*`, `~/go/src/*/*` unless
+you list your own in `~/.config/envup/project-dirs`. See
+[docs/TMUX.md](docs/TMUX.md).
 
 ### Default shell
 
@@ -475,6 +492,32 @@ gitignored file inside the checkout is a trap: it can't sync, on a shared NFS ho
 every machine gets the same one, and anything writing to `~/.zshrc` is writing into
 version control.
 
+The same two layers exist for tmux, nvim and git, each with a template to copy:
+
+| Module | Committed, per machine | Private, wins |
+|---|---|---|
+| zsh | `modules/zsh/files/.zshrc.d/hosts/<host>.zsh` | `~/.zshrc.local` |
+| tmux | `modules/tmux/files/hosts/<host>.conf` | `~/.tmux.local` |
+| nvim | `modules/nvim/files/hosts/<host>.lua` | `~/.config/nvim/local.lua` |
+| git | `modules/git/files/hosts/<host>.gitconfig` | `~/.gitconfig.local` |
+
+```bash
+cp modules/tmux/files/hosts/example.conf.template \
+   modules/tmux/files/hosts/$(hostname -s).conf
+envup install tmux          # links it into place
+```
+
+Neither tmux's `source-file` nor git's `[include]` can expand a hostname, so envup
+resolves it at install time and links your file to one fixed path
+(`~/.tmux/host.conf`, `~/.gitconfig.host`). That is why a **new** host file needs one
+`envup install <module>`; editing an existing one does not. zsh and nvim read the
+hostname themselves and need neither.
+
+git has a third layer below both: `~/.gitconfig.envup`, rewritten on every install
+from what envup can actually find on this machine — the delta pager is enabled there
+if delta exists, and nowhere at all if it doesn't. The committed `.gitconfig` names
+no binary, so `git diff` cannot break on a machine that is missing one.
+
 ### When something writes into your repo anyway
 
 Because `~/.zshrc` is a symlink into the checkout, a third-party installer that
@@ -511,7 +554,8 @@ edited yourself is reported and left alone.
 ## Architecture & Contributing
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — design, guarantees, platform detection, mirrors
-- [docs/TMUX.md](docs/TMUX.md) — tmux cheatsheet
+- [docs/TMUX.md](docs/TMUX.md) — tmux cheatsheet, the project sessionizer, per-machine config
+- [docs/CLIPBOARD.md](docs/CLIPBOARD.md) — copying from a server to your laptop over OSC 52
 - [CONTRIBUTING.md](CONTRIBUTING.md) — adding modules / profiles, tests, releasing
 - [CHANGELOG.md](CHANGELOG.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
 

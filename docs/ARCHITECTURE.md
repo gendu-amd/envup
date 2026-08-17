@@ -182,6 +182,53 @@ The private layer lives in `$HOME`, not in the checkout: a gitignored file insid
 repo can't sync, is shared by every machine on an NFS home, and puts anything writing
 to `~/.zshrc` inside version control. `envup adopt` cleans up after tools that did.
 
+## The per-machine layer, generalised
+
+The last two slices are not a zsh idea; they are the answer to "this box is
+different". Every module whose config differs between machines has the same pair,
+in the same order — repo default, then committed per-machine, then private.
+
+| Module | Committed per-machine | Private | Resolved by |
+|---|---|---|---|
+| zsh | `.zshrc.d/hosts/<host>.zsh` | `~/.zshrc.local` | zsh, at startup |
+| nvim | `hosts/<host>.lua` | `~/.config/nvim/local.lua` | lua, at startup |
+| tmux | `hosts/<host>.conf` → `~/.tmux/host.conf` | `~/.tmux.local` | **envup, at install** |
+| git | `hosts/<host>.gitconfig` → `~/.gitconfig.host` | `~/.gitconfig.local` | **envup, at install** |
+
+The split in the last column is the only subtlety. zsh and nvim can ask the machine
+its own name and build a path from it. tmux's `source-file` and git's `[include]`
+take a literal path and expand nothing, so envup resolves `$ENVUP_HOST` while reading
+`meta.sh` — `caps.sh` exports it before any module is sourced — and links this
+machine's file to one agreed-upon name:
+
+```bash
+LINKS+=("?modules/tmux/files/hosts/${ENVUP_HOST}.conf:$HOME/.tmux/host.conf")
+```
+
+The leading `?` is what makes this work everywhere. A `hosts/<host>` file exists on
+the one machine it describes and nowhere else, so a required link would fail on every
+other machine, forever. `safe_link_optional` skips a missing source and says so at
+info level — absence is a fact here, not a fault, and a warning that is always
+correct to ignore is a warning people learn to ignore. `doctor --authoring` knows the
+same thing and stays quiet about optional sources.
+
+The cost of resolving at install time: adding a **new** host file needs one
+`envup install <module>` to pick it up. Editing an existing one does not.
+
+### A fourth layer, for facts envup discovers
+
+git has one more, weaker than all of them: `~/.gitconfig.envup`, rewritten from
+scratch on every install. It is where a setting goes when it depends on what this
+machine actually has — `delta` as the pager if `bin_path delta` finds one, and
+nothing at all if it doesn't.
+
+This exists because the shared `.gitconfig` is read on every machine, so every binary
+it names is a bet. It used to name three (`nvim` as the editor, `vimdiff` as the
+merge tool, `delta` in `interactive.diffFilter`) and lost all three on a minimal
+server — the delta one turning `git diff` itself into an error. The committed file
+now names no program; anything that does is either generated from detection or
+written by a human who knows which machine they are on.
+
 ## Platform detection
 
 There are two detectors — one at install time (`lib/caps.sh`, bash) and one at shell

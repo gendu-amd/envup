@@ -5,6 +5,78 @@ All notable changes to envup are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Daily-use ergonomics on remote machines. 0.2.0 made envup install correctly on a
+server you don't control; this makes the result pleasant to work in. No breaking
+changes — every addition is inert until you create the file that uses it.
+
+### Per-machine config, for every module that needs it
+
+- **`hosts/<hostname>` layer extended to tmux, nvim and git.** zsh has had one
+  since 0.2.0; it was the only module where machine-specific settings had a
+  committed home. Now each has the same pair — repo default → committed
+  per-machine → private file outside the checkout — with a template to copy:
+  `modules/{tmux,nvim,git}/files/hosts/example.*.template`.
+- zsh and nvim resolve the hostname themselves at startup. tmux's `source-file`
+  and git's `[include]` expand nothing, so envup resolves `$ENVUP_HOST` at
+  install time and links this machine's file to `~/.tmux/host.conf` /
+  `~/.gitconfig.host`. Adding a *new* host file therefore needs one
+  `envup install <module>`; editing an existing one does not.
+- The links are declared optional (`?` prefix), so the machines without a host
+  file — which is most of them — are unaffected.
+
+### Clipboard over SSH
+
+- **OSC 52 end to end.** Copy in tmux or yank in nvim on a server and the text
+  lands on the clipboard of the machine you are sitting at, over the SSH
+  connection already open. No X11 forwarding, no root, no daemon.
+- tmux: `set-clipboard on` (the default `external` silently drops sequences
+  coming *from* applications, so an nvim yank went nowhere) plus an `Ms`
+  terminfo override for `*`, without which tmux emits nothing at all.
+- nvim: an OSC 52 provider that installs itself **only** when the machine has no
+  usable native clipboard tool — `xclip` with no `DISPLAY` doesn't count. Paste
+  deliberately reads nvim's own register rather than querying the terminal:
+  terminals implement OSC 52 write-only on purpose, so the built-in reader
+  blocks for its full ~10s timeout on every `p`. Copies over 64 KB are refused
+  with a message instead of being dropped by the terminal in silence.
+- New [docs/CLIPBOARD.md](docs/CLIPBOARD.md): terminal support table, a
+  layer-by-layer test, and what to enable locally. **VS Code / Cursor ship OSC 52
+  write turned off** (`terminal.integrated.enableClipboardWrite`); the legacy
+  conhost PowerShell window does not support it at all.
+
+### Project switching
+
+- **`prefix f` / `ts`** — fzf over your project roots, then attach-or-create a
+  tmux session named after the project, so picking one you already have open
+  takes you back to it. `modules/tmux/files/bin/tmux-sessionizer`, linked to
+  `~/.local/bin`.
+- Roots come from `~/.config/envup/project-dirs` (one glob per line) with six
+  sensible defaults, so most machines need no configuration. A file rather than
+  an environment variable because a tmux key binding runs under the tmux
+  server's environment, which never sourced your `.zshrc`.
+- The `ts` shortcut is only defined when nothing else on the machine is called
+  `ts` — moreutils ships one.
+
+### Fixed
+
+- **`.gitconfig` no longer names binaries it cannot guarantee.** `core.editor =
+  nvim`, `merge.tool`/`diff.tool = vimdiff` and `interactive.diffFilter = delta`
+  were committed unconditionally and read on every machine. On a box without
+  them that meant a broken `git commit`, a broken `git mergetool`, and — worst —
+  a `git diff` that piped into a missing binary. The editor now comes from
+  `30-env.zsh`'s runtime detection, and delta is enabled only where it exists,
+  via a generated `~/.gitconfig.envup` rewritten on every install and removed on
+  uninstall.
+- **`doctor --authoring` no longer warns about optional link sources.** It
+  stripped the `?` and then checked the file existed anyway, so a
+  `hosts/<hostname>` link produced a warning on every machine that wasn't that
+  one. A missing optional source now logs at info level in `_link` too — absence
+  is a fact there, not a fault.
+- `scripts/lint.sh` now covers `modules/*/files/bin/*`.
+- Added `docs/TMUX.md`, referenced from the README since 0.1.0 but never
+  written.
+
 ## [0.2.0] - 2026-08-15
 
 A cross-platform correctness release. 0.1.0 got the engineering shell right

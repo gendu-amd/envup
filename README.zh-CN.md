@@ -115,7 +115,7 @@ git **子模块**用 git 自己的重定向：
 NFS/autofs 集群上很常见。由此引出两件事，envup 都处理了：
 
 - 软链归属判断同时比对**解析态和未解析态**路径，所以 `/home` → `/mnt/home` 这种自动挂载不会让 envup 拒绝删除自己创建的链接。
-- 每台机器专属的 shell 配置放在 `~/.zshrc.d/hosts/<hostname>.zsh`（纳入版本管理、能同步、按机器天然隔离），而不是一个共享的 "local" 文件。见下文[配置同步](#配置同步)。
+- 每台机器专属的配置放在各模块的 `hosts/<hostname>` 文件里（纳入版本管理、能同步、按机器天然隔离），而不是一个共享的 "local" 文件。zsh、tmux、nvim、git 都有这一层，见下文[配置同步](#配置同步)。
 
 ## Profiles
 
@@ -165,6 +165,14 @@ CLEAN_PATHS=()
 
 新增模块的完整说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+### 在远端机器上干活
+
+tmux 模块里有两件事只在 SSH 场景下才有意义：
+
+**复制的东西落到你自己的电脑上。** 在 nvim 里 yank、或在 tmux 里复制，文字会经由你已经建好的那条 SSH 连接，进到你面前这台机器的剪贴板 —— 不需要 X11 转发、不需要 root、不需要额外的守护进程。但它需要你**本地终端**上的一个开关，这个 envup 管不到：见 [docs/CLIPBOARD.md](docs/CLIPBOARD.md)。（VS Code 和 Cursor 默认是关的。）
+
+**`prefix f` 切项目。** fzf 列出你的项目目录，选中后连上（或新建）一个以项目命名的 tmux session —— 所以选一个已经开着的项目是回到它，而不是再开一份。shell 里也可以用 `ts`。默认扫 `~/work/*`、`~/src/*`、`~/projects/*`、`~/dev/*`、`~/repos/*`、`~/go/src/*/*`，要改就在 `~/.config/envup/project-dirs` 里一行一个写自己的。见 [docs/TMUX.md](docs/TMUX.md)。
+
 ## 配置同步
 
 配置是**软链**而非拷贝：改 `~/.zshrc` 实际改的是仓库里的 `modules/zsh/files/.zshrc`，`git pull` 到另一台机器立即生效，不需要重装。
@@ -183,6 +191,25 @@ $EDITOR ~/.zshrc.local.$(hostname -s)   # 只这台机器
 ```
 
 私有那层特意放在 `$HOME` 而**不是**仓库里。仓库里的 gitignore 文件是个陷阱：它同步不了，NFS 共享 home 上所有机器还共用同一份，而且任何往 `~/.zshrc` 写东西的工具都在往版本控制里写。
+
+tmux、nvim、git 有同样的两层，各自带一份模板可以直接抄：
+
+| 模块 | 提交进仓库、按机器区分 | 私有、优先级最高 |
+|---|---|---|
+| zsh | `modules/zsh/files/.zshrc.d/hosts/<host>.zsh` | `~/.zshrc.local` |
+| tmux | `modules/tmux/files/hosts/<host>.conf` | `~/.tmux.local` |
+| nvim | `modules/nvim/files/hosts/<host>.lua` | `~/.config/nvim/local.lua` |
+| git | `modules/git/files/hosts/<host>.gitconfig` | `~/.gitconfig.local` |
+
+```bash
+cp modules/tmux/files/hosts/example.conf.template \
+   modules/tmux/files/hosts/$(hostname -s).conf
+envup install tmux          # 建链
+```
+
+tmux 的 `source-file` 和 git 的 `[include]` 都不会展开 hostname，所以由 envup 在安装时把名字解析出来、链到一个固定路径（`~/.tmux/host.conf`、`~/.gitconfig.host`）。因此**新建**一个 host 文件需要跑一次 `envup install <模块>`；改已有的不用。zsh 和 nvim 自己读 hostname，两种情况都不用。
+
+git 在这两层之下还有一层 `~/.gitconfig.envup`：每次安装按这台机器上真实存在的东西重写 —— 有 delta 就在这里启用它做 pager，没有就什么都不写。提交进仓库的 `.gitconfig` 里不出现任何二进制名字，所以缺工具的机器上 `git diff` 不会坏掉。
 
 ### 万一还是有东西写进了仓库
 
@@ -221,7 +248,8 @@ $ envup adopt
 ## 文档
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 架构与关键保证
-- [docs/TMUX.md](docs/TMUX.md) —— tmux 速查
+- [docs/TMUX.md](docs/TMUX.md) —— tmux 速查、项目切换器、按机器分层的配置
+- [docs/CLIPBOARD.md](docs/CLIPBOARD.md) —— 用 OSC 52 把服务器上复制的东西送回本机
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 新增模块 / 代码风格 / 测试
 - [CHANGELOG.md](CHANGELOG.md) —— 版本变更与迁移说明
 

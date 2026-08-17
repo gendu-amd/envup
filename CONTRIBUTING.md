@@ -40,10 +40,21 @@ VERIFY_VERSION_ARG="-V"        # optional; default --version
 
 # --- what to link ---------------------------------------------------------
 LINKS=("modules/<name>/files/.foorc:$HOME/.foorc")   # "?" prefix = optional source
+# a per-machine layer, if the tool's config differs between boxes:
+LINKS+=("?modules/<name>/files/hosts/${ENVUP_HOST}.foorc:$HOME/.foorc.host")
 
 APPLIES_IF='...'               # shell condition; false ⇒ 'skipped', not 'failed'
 CLEAN_PATHS=(<path>...)        # caches 'envup clean <name>' removes (never config!)
 ```
+
+`$ENVUP_HOST` (short hostname) is exported before `meta.sh` is sourced, which is
+what makes that second line possible. Use it when the tool's own config format
+cannot expand a hostname — tmux's `source-file` and git's `[include]` both take a
+literal path, so envup resolves the name here and links to one fixed target that
+the committed config then reads unconditionally. The `?` is not optional: the
+file exists on one machine and is absent on all the others, and a required link
+would fail everywhere else forever. Ship a
+`files/hosts/example.<ext>.template` alongside it.
 
 Pick providers by how the tool is actually distributed:
 
@@ -163,7 +174,15 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   symlinked-home cases), `manifest`, `health`, `doctor`, `adopt`, and
   `zshconfig` (which starts real interactive zsh shells to assert slice order,
   PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
-  change these.
+  change these. Three cover shipped config rather than library code:
+  `hosts` (the per-machine layer across all four modules, and its load order),
+  `gitconfig` (that the committed config names no binary, and the generated
+  `~/.gitconfig.envup` lifecycle), and `clipboard` (the OSC 52 settings, each of
+  which fails silently when wrong).
+- **Scripts under `modules/*/files/bin/`** are first-party sources: `lint.sh`
+  covers them, and they get behavioural tests, not grep tests — see
+  `tests/unit/sessionizer.bats`, which stubs `tmux` and `fzf` to exercise the
+  failure paths a key binding has no way to report.
 - **Integration** (`tests/integration/`): `dry-run.bats` asserts every profile
   installs side-effect free; `doctor.bats` validates the authoring rules against
   fixture modules; `smoke.sh` does a real install→status→uninstall of the `git`
