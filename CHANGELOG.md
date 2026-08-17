@@ -158,6 +158,14 @@ changes — every addition is inert until you create the file that uses it.
   server's environment, which never sourced your `.zshrc`.
 - The `ts` shortcut is only defined when nothing else on the machine is called
   `ts` — moreutils ships one.
+- **The picker opens in a popup** over the current pane on tmux 3.2 and up:
+  nothing in your layout moves, and cancelling leaves nothing behind. Older tmux
+  keeps the throwaway window. `prefix f` now runs `tmux-sessionizer --launch`,
+  which asks the running server its version and opens the right one — so
+  upgrading tmux is enough by itself, and the decision is testable in a way an
+  `if-shell` condition in the config never was. Unparseable versions (OpenBSD
+  reports `openbsd-7.4`) read as old. Override with
+  `tmux set-environment -g ENVUP_TS_POPUP 0` / `1`.
 
 ### Fixed
 

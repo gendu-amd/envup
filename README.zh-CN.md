@@ -173,7 +173,7 @@ tmux 模块里有三件事只在 SSH 场景下才有意义：
 
 **复制的东西落到你自己的电脑上。** 在 nvim 里 yank、或在 tmux 里复制，文字会经由你已经建好的那条 SSH 连接，进到你面前这台机器的剪贴板 —— 不需要 X11 转发、不需要 root、不需要额外的守护进程。但它需要你**本地终端**上的一个开关，这个 envup 管不到：见 [docs/CLIPBOARD.md](docs/CLIPBOARD.md)。（VS Code 和 Cursor 默认是关的。）
 
-**`prefix f` 切项目。** fzf 列出你的项目目录，选中后连上（或新建）一个以项目命名的 tmux session —— 所以选一个已经开着的项目是回到它，而不是再开一份。shell 里也可以用 `ts`。默认扫 `~/work/*`、`~/src/*`、`~/projects/*`、`~/dev/*`、`~/repos/*`、`~/go/src/*/*`，要改就在 `~/.config/envup/project-dirs` 里一行一个写自己的。见 [docs/TMUX.md](docs/TMUX.md)。
+**`prefix f` 切项目。** fzf 列出你的项目目录，选中后连上（或新建）一个以项目命名的 tmux session —— 所以选一个已经开着的项目是回到它，而不是再开一份。tmux ≥ 3.2 会在当前 pane 上开一个 popup，更老的版本退回临时窗口 —— 按键时自己问，不用配。shell 里也可以用 `ts`。默认扫 `~/work/*`、`~/src/*`、`~/projects/*`、`~/dev/*`、`~/repos/*`、`~/go/src/*/*`，要改就在 `~/.config/envup/project-dirs` 里一行一个写自己的。见 [docs/TMUX.md](docs/TMUX.md)。
 
 ## 配置同步
 

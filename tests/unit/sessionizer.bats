@@ -16,6 +16,9 @@ setup() {
     stub_bin tmux <<'EOF'
 #!/bin/bash
 printf 'tmux %s\n' "$*" >> "$TMUX_CALLS"
+# The version is the machine's single most important property here, and every
+# machine has exactly one. $TMUX_VERSION lets a test have the other ones.
+if [[ "$1" == -V ]]; then printf 'tmux %s\n' "${TMUX_VERSION:-3.4}"; exit 0; fi
 # has-session: only 'existing' is already there.
 if [[ "$1" == has-session ]]; then
     [[ "$2" == "=existing" ]] && exit 0
@@ -195,10 +198,116 @@ EOF
 }
 
 @test "tmux binds it, and envup links it onto PATH" {
-    grep -q "bind f new-window -n sessionizer 'ENVUP_TS_PAUSE=1 ~/.local/bin/tmux-sessionizer'" \
+    grep -q "bind f run-shell -b '~/.local/bin/tmux-sessionizer --launch'" \
         "$REPO_ROOT/modules/tmux/files/.tmux.conf"
     grep -q 'modules/tmux/files/bin/tmux-sessionizer:\$HOME/.local/bin/tmux-sessionizer' \
         "$REPO_ROOT/modules/tmux/meta.sh"
+}
+
+# ---- --launch: opening a terminal for a key binding that has none --------
+#
+# `prefix f` runs under run-shell, with no tty. All it can do is ask tmux to
+# open something and re-enter this script inside it — a popup where tmux is new
+# enough, a throwaway window where it is not. Getting that wrong is a key that
+# does nothing, on exactly the old machine you cannot test from your laptop.
+
+launch() { TMUX="/tmp/fake,1,0" run "$SZ" --launch; }
+
+@test "tmux 3.2 gets a popup" {
+    TMUX_VERSION=3.2 launch
+    [ "$status" -eq 0 ]
+    grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "a version with a letter after it is still a version" {
+    # Every other tmux release is 3.2a, 3.3a, 3.5a.
+    TMUX_VERSION=3.2a launch
+    grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "anything before 3.2 gets the throwaway window" {
+    # display-popup did not exist. Sending it there is a binding that reports
+    # 'unknown command' into the status line and opens nothing.
+    TMUX_VERSION=2.7 launch
+    [ "$status" -eq 0 ]
+    grep -q 'new-window -n sessionizer' "$TMUX_CALLS"
+    ! grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "3.10 is newer than 3.2, not older" {
+    # The version compared as a number instead of two is the bug that shows up
+    # once, years late, and only on the newest machine in the fleet.
+    TMUX_VERSION=3.10 launch
+    grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "a development build is read by its number" {
+    TMUX_VERSION=next-3.5 launch
+    grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "a version that means nothing to us takes the path that always works" {
+    # OpenBSD's tmux reports the OS release — 'openbsd-7.4' says nothing about
+    # which features are in it. Guessing 'new enough' there costs the binding.
+    TMUX_VERSION=openbsd-7.4 launch
+    grep -q 'new-window -n sessionizer' "$TMUX_CALLS"
+}
+
+@test "the popup asks for nothing that arrived after 3.2" {
+    # -T (title) is 3.3. A flag the server does not know makes the whole
+    # command fail, so the popup would simply never appear on the one version
+    # this check exists to support.
+    TMUX_VERSION=3.2 launch
+    ! grep -qe '-T' "$TMUX_CALLS"
+}
+
+@test "ENVUP_TS_POPUP overrules the version, both directions" {
+    TMUX_VERSION=3.4 ENVUP_TS_POPUP=0 launch
+    grep -q 'new-window -n sessionizer' "$TMUX_CALLS"
+
+    : > "$TMUX_CALLS"
+    TMUX_VERSION=2.7 ENVUP_TS_POPUP=1 launch
+    grep -q 'display-popup' "$TMUX_CALLS"
+}
+
+@test "a meaningless ENVUP_TS_POPUP is ignored, not treated as yes" {
+    TMUX_VERSION=2.7 ENVUP_TS_POPUP=yes launch
+    grep -q 'new-window -n sessionizer' "$TMUX_CALLS"
+}
+
+@test "whatever it opens, the error pause is on inside it" {
+    # Both containers close the moment the command exits, so this is the only
+    # thing standing between a missing fzf and a key that looks broken.
+    TMUX_VERSION=3.2 launch
+    grep -q 'ENVUP_TS_PAUSE=1' "$TMUX_CALLS"
+
+    : > "$TMUX_CALLS"
+    TMUX_VERSION=2.7 launch
+    grep -q 'ENVUP_TS_PAUSE=1' "$TMUX_CALLS"
+}
+
+@test "it re-enters itself by full path, not by name" {
+    # run-shell has the tmux server's PATH, which is whatever was in the
+    # environment of the login that first started it — frequently without
+    # ~/.local/bin on it.
+    TMUX_VERSION=3.2 launch
+    grep -q "display-popup .*$SZ" "$TMUX_CALLS"
+}
+
+@test "a relative call still resolves to this script" {
+    cd "$(dirname "$SZ")"
+    TMUX="/tmp/fake,1,0" TMUX_VERSION=3.2 run ./tmux-sessionizer --launch
+    [ "$status" -eq 0 ]
+    grep -q "display-popup .*$SZ" "$TMUX_CALLS"
+}
+
+@test "--launch outside tmux is refused, not aimed at some other session" {
+    # There is no client to put a popup on. new-window would land in whichever
+    # session tmux picked, which is not where you are looking.
+    run env -u TMUX "$SZ" --launch
+    [ "$status" -ne 0 ]
+    [ ! -s "$TMUX_CALLS" ]
+    [[ "$output" == *"ts"* ]]
 }
 
 @test "the ts shortcut refuses to shadow another ts" {

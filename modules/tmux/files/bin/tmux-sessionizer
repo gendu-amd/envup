@@ -8,6 +8,7 @@
 #
 #   tmux-sessionizer            fzf over every project root
 #   tmux-sessionizer <dir>      skip the picker, go straight there
+#   tmux-sessionizer --launch   what `prefix f` runs; opens one of the above
 #
 # Bound to `prefix + f` inside tmux, and to `ts` in zsh. Works from outside tmux
 # too (it attaches rather than switching).
@@ -15,15 +16,15 @@ set -uo pipefail
 
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/envup/project-dirs"
 
-# $ENVUP_TS_PAUSE is set by the tmux key binding, and only by it. A binding runs
-# in a throwaway window that tmux closes the instant the command exits, so an
-# error message would be on screen for a few milliseconds and the key would look
-# like it did nothing at all. From the shell (`ts`) there is no window to lose,
-# so it does not pause there.
+# $ENVUP_TS_PAUSE is set by --launch, and only by it. Whichever container the
+# key binding opens — a popup or a throwaway window — tmux tears it down the
+# instant the command exits, so an error message would be on screen for a few
+# milliseconds and `prefix f` would look like a key that does nothing at all.
+# From the shell (`ts`) there is nothing to lose, so it does not pause there.
 die() {
     printf '%s\n' "tmux-sessionizer: $*" >&2
     if [[ -n "${ENVUP_TS_PAUSE:-}" && -r /dev/tty ]]; then
-        printf 'press Enter to close this window...' >&2
+        printf 'press Enter to close...' >&2
         read -r _ </dev/tty || true
     fi
     exit 1
@@ -62,6 +63,71 @@ candidates() {
 }
 
 command -v tmux >/dev/null 2>&1 || die "tmux is not installed here"
+
+# ---- --launch: how `prefix f` gets here ----------------------------------
+#
+# A key binding runs under `run-shell`, which has no terminal at all, so the
+# only thing it can do is ask tmux to open one and run this script again inside
+# it. There are two ways to open one:
+#
+#   display-popup   tmux 3.2 and up — a box over the current pane, nothing
+#                   in your layout moves and nothing is left behind
+#   new-window      everything older — a throwaway window, as before
+#
+# The choice is made here, at keypress time, rather than with an `if-shell` in
+# .tmux.conf. Same answer either way on a given machine, but this one also
+# survives upgrading tmux without re-sourcing the config — and it is testable,
+# which an if-shell condition is not.
+
+# `tmux -V` says "tmux 3.2a", sometimes "tmux next-3.5", and on OpenBSD "tmux
+# openbsd-7.4" — a number that tracks the OS release and says nothing about the
+# features. Anything we cannot parse reads as too old, which is the branch that
+# works everywhere.
+tmux_at_least() {
+    local v
+    v="$(tmux -V 2>/dev/null)" || return 1
+    v="${v##* }"; v="${v#next-}"
+    [[ "$v" =~ ^([0-9]+)\.([0-9]+) ]] || return 1
+    (( BASH_REMATCH[1] > $1 || (BASH_REMATCH[1] == $1 && BASH_REMATCH[2] >= $2) ))
+}
+
+# The path to re-enter ourselves by. run-shell goes through `sh -c`, which
+# expands the ~ in the binding, so $0 is normally already absolute — but a
+# relative call has to keep working, because tmux runs the command from the
+# pane's directory and not from ours.
+self_path() {
+    case "$0" in
+        /*) printf '%s\n' "$0" ;;
+        *)  printf '%s/%s\n' "$(cd -- "$(dirname -- "$0")" && pwd)" "$(basename -- "$0")" ;;
+    esac
+}
+
+launch() {
+    [[ -n "${TMUX:-}" ]] || die "--launch is for the tmux key binding; run 'ts' instead"
+
+    local cmd popup
+    cmd="ENVUP_TS_PAUSE=1 $(printf '%q' "$(self_path)")"
+
+    # Set ENVUP_TS_POPUP to 0 or 1 to overrule the version check — from a
+    # host.conf, `tmux set-environment -g ENVUP_TS_POPUP 0`.
+    popup="${ENVUP_TS_POPUP:-}"
+    if [[ "$popup" != 0 && "$popup" != 1 ]]; then
+        if tmux_at_least 3 2; then popup=1; else popup=0; fi
+    fi
+
+    if (( popup )); then
+        # -E closes the popup when the command exits. No -T: the title flag only
+        # arrived in 3.3, and the whole point of the check is to work on 3.2.
+        tmux display-popup -E -w 60% -h 60% "$cmd"
+    else
+        tmux new-window -n sessionizer "$cmd"
+    fi
+}
+
+if [[ "${1:-}" == --launch ]]; then
+    launch
+    exit $?
+fi
 
 if (( $# > 0 )); then
     selected="$1"

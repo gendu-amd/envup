@@ -151,6 +151,19 @@ ts ~/work/thing   skip the picker
 ships one. The script is always available under its full name,
 `tmux-sessionizer`.
 
+From tmux 3.2 the picker opens in a **popup** over the current pane: your layout
+does not move, and there is no window left behind if you change your mind. Older
+tmux gets a throwaway window instead, which is what everyone got before. Nothing
+to configure — the binding asks the running server which it is, so upgrading
+tmux is enough on its own.
+
+```bash
+tmux set-environment -g ENVUP_TS_POPUP 0    # window even on a new tmux
+tmux set-environment -g ENVUP_TS_POPUP 1    # popup even on an old one
+```
+
+The same line in `hosts/<hostname>.conf` makes it permanent for that machine.
+
 ### Telling it where your projects are
 
 Out of the box it globs `~/work/*`, `~/src/*`, `~/projects/*`, `~/dev/*`,

@@ -292,7 +292,9 @@ already have — no X11 forwarding, no root, no daemon. It needs one setting in 
 
 **`prefix f` switches projects.** fzf over your project roots, then attach-or-create
 a tmux session named after the project — so picking one you already have open takes
-you back to it instead of opening a second copy. Also `ts` from the shell. Roots are
+you back to it instead of opening a second copy. In a popup over the current pane
+where tmux is 3.2 or newer, in a throwaway window where it is older; the binding
+asks. Also `ts` from the shell. Roots are
 `~/work/*`, `~/src/*`, `~/projects/*`, `~/dev/*`, `~/repos/*`, `~/go/src/*/*` unless
 you list your own in `~/.config/envup/project-dirs`. See
 [docs/TMUX.md](docs/TMUX.md).
