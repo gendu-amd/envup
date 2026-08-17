@@ -132,6 +132,89 @@ net_clone() {
         -- git clone --quiet "${depth[@]+"${depth[@]}"}" "$@" "$real" "$dest"
 }
 
+# ---- integrity -----------------------------------------------------------
+# What a checksum is worth here, precisely: it is published in the same release
+# and fetched over the same link, so it does not protect you from an upstream
+# that was compromised or a mirror that is actively hostile — either can serve a
+# matching pair. What it catches is the download that simply arrived wrong, and
+# that is the one that actually happens: a corporate proxy answering 200 with a
+# captive-portal page, a transfer truncated at the byte the link dropped, a
+# mirror a week stale handing back the previous release. All three install
+# without complaint and go wrong later, somewhere with no obvious connection to
+# the download.
+
+# net_digest <file> <bits> — lowercase hex digest, or nothing if this machine
+# cannot compute one. Three implementations because there is no one command:
+# coreutils on Linux, shasum (perl) on everything Apple ships, openssl on the
+# stripped images that have neither.
+net_digest() {
+    local f="$1" bits="$2" out="" re
+    if   have "sha${bits}sum"; then out="$("sha${bits}sum" "$f" 2>/dev/null)"
+    elif have shasum;          then out="$(shasum -a "$bits" "$f" 2>/dev/null)"
+    elif have openssl;         then out="$(openssl dgst "-sha$bits" "$f" 2>/dev/null)"
+    else return 1
+    fi
+    # coreutils and shasum print "<hex>  <name>"; openssl prints
+    # "SHA256(<name>)= <hex>". Pull the digest out by its shape rather than by
+    # field number, and the difference stops mattering.
+    re="[0-9a-fA-F]{$((bits / 4))}"
+    [[ "$out" =~ $re ]] || return 1
+    tr '[:upper:]' '[:lower:]' <<<"${BASH_REMATCH[0]}" | tr -d '\n'
+}
+
+# net_sum_lookup <sums-file> <name> — the digest that file claims for <name>.
+# Three layouts in the wild: GNU ("<hex>  name", "<hex> *name" for binary), BSD
+# and openssl ("SHA256 (name) = <hex>"), and a sidecar holding nothing but the
+# number. A manifest may also carry a path, so only the basename is compared.
+net_sum_lookup() {
+    local f="$1" want="$2" line hex name
+    [[ -r "$f" ]] || return 1
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if   [[ "$line" =~ ^[[:space:]]*([0-9a-fA-F]{64,128})[[:space:]]*$ ]]; then
+            hex="${BASH_REMATCH[1]}"; name="$want"
+        elif [[ "$line" =~ ^[[:space:]]*([0-9a-fA-F]{64,128})[[:space:]]+\*?([^[:space:]]+) ]]; then
+            hex="${BASH_REMATCH[1]}"; name="${BASH_REMATCH[2]}"
+        elif [[ "$line" =~ \(([^\)]+)\)[[:space:]]*=[[:space:]]*([0-9a-fA-F]{64,128})[[:space:]]*$ ]]; then
+            name="${BASH_REMATCH[1]}"; hex="${BASH_REMATCH[2]}"
+        else
+            continue
+        fi
+        [[ "${name##*/}" == "$want" ]] || continue
+        case "${#hex}" in 64|128) ;; *) continue ;; esac
+        tr '[:upper:]' '[:lower:]' <<<"$hex" | tr -d '\n'
+        return 0
+    done < "$f"
+    return 1
+}
+
+# net_verify_file <file> <sums-file> [name-in-that-file] — three answers, not
+# two, because "the digests disagree" and "there is nothing to compare against"
+# call for completely different handling by the caller.
+#   0  match
+#   1  mismatch — this file is not what the release says it is
+#   2  cannot tell: no digest for this name, or no tool here to compute one
+net_verify_file() {
+    local f="$1" sums="$2" name="${3:-$(basename "$1")}" want got bits
+    want="$(net_sum_lookup "$sums" "$name")" || {
+        log_debug "$(basename "$sums") lists no digest for $name"
+        return 2
+    }
+    case "${#want}" in
+        64)  bits=256 ;;
+        128) bits=512 ;;
+        *)   return 2 ;;
+    esac
+    got="$(net_digest "$f" "$bits")" || {
+        log_debug "no sha$bits tool here (sha${bits}sum, shasum, openssl) — cannot check $name"
+        return 2
+    }
+    [[ "$got" == "$want" ]] && return 0
+    log_error "$name failed its sha$bits check"
+    log_error "  expected $want"
+    log_error "  got      $got"
+    return 1
+}
+
 # ---- git submodule plugins (zsh/tmux) ------------------------------------
 # Lives here because it is a network fetch like any other: the plugins come from
 # GitHub over the same link, with the same failure modes.

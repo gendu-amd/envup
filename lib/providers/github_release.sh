@@ -206,6 +206,66 @@ _ghr_place_tree() {
     log_debug "[$NAME] linked $n binaries from $dest/bin"
 }
 
+# ---- integrity -----------------------------------------------------------
+# _ghr_sum_url <asset-url> <every asset url...> — something in the same release
+# that vouches for the chosen asset, sidecar first because it is unambiguous.
+_ghr_sum_url() {
+    local asset="$1"; shift
+    local base="${asset##*/}" u b
+    for u in "$@"; do
+        b="${u##*/}"
+        if [[ "$b" == "$base".sha256 || "$b" == "$base".sha256sum \
+           || "$b" == "$base".sha512 || "$b" == "$base".sum ]]; then
+            printf '%s' "$u"; return 0
+        fi
+    done
+    # Otherwise one manifest for the whole release. goreleaser writes
+    # checksums.txt, neovim writes shasum.txt, fzf writes
+    # <name>_<version>_checksums.txt.
+    for u in "$@"; do
+        b="$(tr '[:upper:]' '[:lower:]' <<<"${u##*/}")"
+        case "$b" in
+            *checksums.txt|checksums|sha256sums*|sha256sum.txt|sha512sums*|shasum.txt)
+                printf '%s' "$u"; return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# Plenty of upstreams publish nothing — fd, bat and delta among them — so an
+# absent checksum cannot be fatal by default or those modules simply stop
+# installing. ENVUP_REQUIRE_CHECKSUM=1 makes it fatal, which is what you want
+# when ENVUP_GH_MIRROR points at a proxy you do not run.
+_ghr_unverified() {
+    if [[ "${ENVUP_REQUIRE_CHECKSUM:-0}" == 1 ]]; then
+        log_error "[$NAME] $1, and ENVUP_REQUIRE_CHECKSUM=1"
+        return 1
+    fi
+    log_debug "[$NAME] not verified: $1"
+}
+
+# _ghr_check <file> <asset-url> <tmpdir> <every asset url...>
+_ghr_check() {
+    local file="$1" asset="$2" tmp="$3"; shift 3
+    local sumurl rc sums="$tmp/sums"
+
+    sumurl="$(_ghr_sum_url "$asset" "$@")" \
+        || { _ghr_unverified "this release publishes no checksums"; return $?; }
+
+    # Quietly: a 404 on the sums file is a thing we handle, not a thing to
+    # print curl's opinion of.
+    if ! net_fetch "$sumurl" "$sums" >>"${ENVUP_LOG_FILE:-/dev/null}" 2>&1; then
+        _ghr_unverified "could not download $(basename "$sumurl")"; return $?
+    fi
+
+    net_verify_file "$file" "$sums" "$(basename "${asset%%\?*}")"; rc=$?
+    case "$rc" in
+        0) log_debug "[$NAME] $(basename "$file") matches $(basename "$sumurl")" ;;
+        1) return 1 ;;
+        *) _ghr_unverified "$(basename "$sumurl") had nothing usable for this asset"; return $? ;;
+    esac
+}
+
 # ---- the provider --------------------------------------------------------
 provider_github_release() {
     local repo="${1:-$GH_REPO}" bin="${GH_BIN:-$VERIFY_BIN}"
@@ -246,6 +306,12 @@ provider_github_release() {
     local file="$tmp/$(basename "${asset%%\?*}")" rc=0
     if ! net_fetch "$asset" "$file"; then
         rm -rf "$tmp"; log_error "[$NAME] download failed: $asset"; return 1
+    fi
+
+    if ! _ghr_check "$file" "$asset" "$tmp" "${urls[@]}"; then
+        rm -rf "$tmp"
+        log_hint "a mirror can hand back a stale or truncated file — retry without ENVUP_GH_MIRROR, or pin a known-good tag in versions.lock"
+        return 1
     fi
 
     mkdir -p "$tmp/x"

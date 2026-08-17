@@ -167,6 +167,32 @@ changes — every addition is inert until you create the file that uses it.
   reports `openbsd-7.4`) read as old. Override with
   `tmux set-environment -g ENVUP_TS_POPUP 0` / `1`.
 
+### Downloads that are what the release says they are
+
+- **`github_release` now verifies what it downloaded.** The provider already
+  filtered `.sha256` / `.sha512` / `checksums.txt` out of the asset candidates —
+  correctly, they are not the binary — but then discarded them. Now it looks for
+  the digest that covers the chosen asset (sidecar first, then the release-wide
+  manifest under any of the names goreleaser, neovim and fzf give it) and
+  compares before unpacking.
+- **What this is and is not worth.** The digest is published in the same release
+  and fetched over the same link, so it says nothing about an upstream that was
+  compromised or a mirror that is actively hostile — either can serve a matching
+  pair. It catches the ones that actually happen: a corporate proxy answering
+  200 with a captive-portal page, a transfer truncated where the link dropped, a
+  mirror a week stale handing back the previous release. All three used to
+  install without a word and fail later, somewhere with no visible connection to
+  the download.
+- **Missing digests are not fatal by default.** fd, bat and delta publish none;
+  refusing them would trade a working install for a guarantee that isn't on
+  offer. The skip is a debug log line. `ENVUP_REQUIRE_CHECKSUM=1` makes it a
+  refusal instead — the setting for when `ENVUP_GH_MIRROR` points at a proxy you
+  don't operate.
+- Digests are computed with whichever of `sha256sum` / `shasum` / `openssl` the
+  machine has, since no single one is everywhere: coreutils is absent from a
+  stock macOS, `shasum` from slim Linux images. A machine with none of the three
+  reports that it cannot check rather than passing the file.
+
 ### Fixed
 
 - **`.gitconfig` no longer names binaries it cannot guarantee.** `core.editor =

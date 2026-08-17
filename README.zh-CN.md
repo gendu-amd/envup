@@ -101,9 +101,14 @@ envup 里没有任何一处会弹 `sudo` 密码提示。它用 `sudo -n true` �
 ```bash
 ENVUP_GH_MIRROR=https://ghproxy.com ./envup install    # GitHub 走镜像
 ENVUP_OFFLINE=1 ./envup install --profile minimal      # 根本不尝试，只落配置
+ENVUP_REQUIRE_CHECKSUM=1 ./envup install               # 校验不了的二进制就不装
 ```
 
-envup 所有出网都收敛在一处（`lib/net.sh`），所以这两个变量覆盖全部场景 —— release 下载、clone、厂商安装脚本都算。模块里出现裸 `curl` 是 lint 错误，就是为了保证这一点，`envup doctor --authoring` 会拦。
+下载下来的 release 二进制会和同一个 release 里发布的摘要（`checksums.txt`、`<资产名>.sha256` 之类）比对。这防不住上游被入侵——摘要和文件走的是同一条链路——但它拦得住真正常见的那类事故：代理返回 200 加一个登录页、连接中断留下半个文件、镜像慢了一周还在发上个版本。这三种现在都能装得干干净净，然后在别的地方出问题。
+
+不少上游（fd、bat、delta）压根不发摘要，所以"没得校验"默认只记一条 debug 日志，照装。`ENVUP_REQUIRE_CHECKSUM=1` 把它变成拒绝——`ENVUP_GH_MIRROR` 指向一个不是你自己运维的代理时，值得开。
+
+envup 所有出网都收敛在一处（`lib/net.sh`），所以这些变量覆盖全部场景 —— release 下载、clone、厂商安装脚本都算。模块里出现裸 `curl` 是 lint 错误，就是为了保证这一点，`envup doctor --authoring` 会拦。
 
 `https_proxy` / `http_proxy` 在提权时会被保留（设了代理就用 `sudo -E`）—— 这是公司代理下 `apt-get install` 能成功的前提。
 

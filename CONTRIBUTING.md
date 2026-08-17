@@ -181,7 +181,10 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   which fails silently when wrong), `tmuxrestore` (the login hook, the
   per-machine resurrect directory, and nvim's `Session.vim`), `searchtools`
   (ripgrep / fd / delta, whose whole difficulty is that the package, the binary
-  and the module go by three different names), and `nvimconfig` (the editor
+  and the module go by three different names), `checksum` (digest computation
+  across the three tools that exist, the three checksum-file layouts upstreams
+  use, and the difference between "mismatch" and "nothing to compare against"),
+  and `nvimconfig` (the editor
   config as text — nothing there runs neovim, because the machines this repo
   targets are exactly the ones where it may not start). `tmuxrestore`
   runs the login hook on a real terminal via zsh's own `zsh/zpty` — a hook whose

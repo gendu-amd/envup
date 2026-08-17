@@ -167,9 +167,23 @@ reinstall needed.
 ```bash
 ENVUP_GH_MIRROR=https://ghproxy.com ./envup install    # route GitHub through a mirror
 ENVUP_OFFLINE=1 ./envup install --profile minimal      # don't even try; land the configs
+ENVUP_REQUIRE_CHECKSUM=1 ./envup install               # refuse what can't be checked
 ```
 
-Every outbound request in envup goes through one place (`lib/net.sh`), so those two
+A downloaded release binary is checked against the digest published in the same
+release (`checksums.txt`, `<asset>.sha256`, and the other spellings upstreams use).
+That does not protect you from a compromised upstream — the digest travels the same
+link as the file — but it does catch the failures that actually happen: a proxy
+answering 200 with a login page, a transfer cut off mid-file, a mirror a week behind
+still serving the previous release. All three install cleanly today and go wrong
+somewhere else later.
+
+Plenty of upstreams (fd, bat, delta) publish no digest at all, so "nothing to check
+against" is a debug log line and the install continues. `ENVUP_REQUIRE_CHECKSUM=1`
+makes it a refusal instead — worth setting when `ENVUP_GH_MIRROR` points at a proxy
+you don't run.
+
+Every outbound request in envup goes through one place (`lib/net.sh`), so those
 variables cover all of it — releases, clones, and vendor install scripts alike. A
 module that reaches for `curl` on its own is a lint error, precisely so this stays
 true. `envup doctor --authoring` enforces it.
@@ -401,6 +415,7 @@ envup recognises these env vars at install time. All are optional; defaults are 
 | `ENVUP_DRY_RUN` | `0` | When `1`, every destructive step prints what it would do without changing anything. `--dry-run` sets this automatically. |
 | `ENVUP_OFFLINE` | `0` | When `1`, no network is attempted at all — downloads decline immediately instead of waiting for a timeout, and configs are still linked. |
 | `ENVUP_GH_MIRROR` | — | Prefix that all GitHub traffic is routed through, e.g. `https://ghproxy.com`. Covers releases, clones and vendor install scripts. |
+| `ENVUP_REQUIRE_CHECKSUM` | `0` | When `1`, a release binary that can't be checked against a published digest is refused instead of installed. Off by default because several upstreams (fd, bat, delta) publish no checksums at all. Worth turning on with `ENVUP_GH_MIRROR`. |
 | `ENVUP_LOCAL_BIN` | `~/.local/bin` | Where root-free installs put binaries. |
 | `ENVUP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` — terminal verbosity. The log file always records everything. |
 | `ENVUP_MODULE_TIMEOUT` | `900` | Outer watchdog around each module hook. A hung module is killed and reported failed; the run continues. |
