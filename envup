@@ -53,14 +53,6 @@ envup_version() {
     fi
 }
 
-# One timestamped log file per command (reused if already open).
-log_init() {
-    [[ "${ENVUP_LOG_FILE:-/dev/null}" != /dev/null ]] && return 0
-    local dir="$HOME/.local/state/envup/logs"; mkdir -p "$dir"
-    ENVUP_LOG_FILE="$dir/$1_$(date +%Y%m%d_%H%M%S).log"; export ENVUP_LOG_FILE
-    log_info "log: $ENVUP_LOG_FILE"
-}
-
 # ---- install -------------------------------------------------------------
 cmd_install() {
     local profile="" dry=0; local -a mods=()
@@ -184,7 +176,10 @@ cmd_upgrade() {
         -n|--dry-run) dry=1; shift ;;
         -k|--keep-going) keep=1; shift ;;
         -r|--ref) ref="${2:-}"; [[ -n "$ref" ]] || { log_error "--ref needs a tag or branch"; return 1; }; shift 2 ;;
-        -p|--profile) fwd+=(--profile "${2:-}"); shift 2 ;;
+        # The guard is not decoration: `shift 2` with one argument left fails
+        # *without shifting*, and `while (($#))` then spins forever.
+        -p|--profile) [[ -n "${2:-}" ]] || { log_error "--profile needs a name"; return 1; }
+                      fwd+=(--profile "$2"); shift 2 ;;
         -h|--help) cat <<EOF
 Usage: envup upgrade [-n] [-k] [-r REF] [-p PROFILE] [MODULE...]
   Update the source, then re-run install for everything in the manifest.
@@ -257,6 +252,10 @@ cmd_status() {
     case "${1:-}" in
         -h|--help) echo "Usage: envup status [--json]"; return 0 ;;
         --json)    _status_json; return 0 ;;
+        "")        ;;
+        # Silently ignoring `--jsonn` and printing the human table is the worst
+        # possible answer for a script that asked for JSON.
+        *)         log_error "unknown option: $1"; echo "Usage: envup status [--json]" >&2; return 1 ;;
     esac
     log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG  Priv: $ENVUP_PRIV"
     echo; echo "Modules:"
@@ -290,7 +289,8 @@ cmd_clean() {
         -n|--dry-run) dry=1; shift ;;
         --all) all=1; shift ;;
         -h|--help) echo "Usage: envup clean [-n] [--all | MODULE...]"; return 0 ;;
-        --*) m="${1#--}"; if module_exists "$m"; then tgt+=("$m"); else log_error "no module: $m"; return 1; fi; shift ;;
+        --*) m="${1#--}"; module_exists "$m" || { log_error "unknown option: $1"; return 1; }
+             tgt+=("$m"); shift ;;
         *)   if module_exists "$1"; then tgt+=("$1"); else log_error "no module: $1"; return 1; fi; shift ;;
     esac; done
     # --all used to be `tgt=()`, which cleared whatever had been parsed *before*
@@ -321,8 +321,13 @@ cmd_clean() {
 # ---- log -----------------------------------------------------------------
 cmd_log() {
     local follow=0
-    [[ "${1:-}" == --tail || "${1:-}" == -f ]] && follow=1
-    local dir="$HOME/.local/state/envup/logs"
+    case "${1:-}" in
+        -f|--tail) follow=1 ;;
+        -h|--help) echo "Usage: envup log [--tail]"; return 0 ;;
+        "")        ;;
+        *)         log_error "unknown option: $1"; echo "Usage: envup log [--tail]" >&2; return 1 ;;
+    esac
+    local dir="$ENVUP_LOG_DIR"
     [[ -d "$dir" ]] || { log_info "no logs yet"; return 0; }
     # ls -t is the pragmatic way to pick the newest log; names are our own
     # timestamped files, so the non-alphanumeric caveat behind SC2012 doesn't apply.
@@ -337,6 +342,11 @@ cmd_log() {
 # ---- doctor / adopt ------------------------------------------------------
 # Both live in lib/ (doctor.sh, adopt.sh): they are the largest single body of
 # logic envup has, and this file stays a dispatcher.
+#
+# Both can change the machine — `doctor --fix` rebuilds links and drops
+# manifest orphans, `adopt` moves file content out of the repo — so both call
+# log_init, like every other command that does. They do it themselves, after
+# parsing, so that `--help` doesn't leave a log file behind.
 cmd_doctor() { doctor_main "$@"; }
 cmd_adopt()  { adopt_main  "$@"; }
 
@@ -354,7 +364,7 @@ Usage: envup <command> [options]
   adopt      [-n] [PATH...]                  Move third-party edits out of the repo
   clean      [--all | MODULE...]             Clear caches declared in meta.sh
   log        [--tail]                        Show the latest command log
-  version    (--version, -V)                  Print the envup version
+  version    (--version, -V)                 Print the envup version
 
 Run 'envup <command> --help' for command options.
 EOF

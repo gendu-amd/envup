@@ -30,8 +30,7 @@
 # Depends on: log.sh
 # ============================================
 
-ENVUP_STATE_DIR="${ENVUP_STATE_DIR:-$HOME/.local/state/envup}"
-ENVUP_MANIFEST="$ENVUP_STATE_DIR/installed"
+ENVUP_MANIFEST="$ENVUP_STATE_DIR/installed"   # $ENVUP_STATE_DIR: see lib/log.sh
 ENVUP_MANIFEST_SCHEMA=2
 
 _manifest_ensure() {

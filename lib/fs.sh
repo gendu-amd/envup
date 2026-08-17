@@ -15,8 +15,8 @@
 # I3 is also why the last two sections exist: a directory or a file that only
 # exists because envup made one has to go back too, and neither is a symlink.
 #
-# Depends on: log.sh (and $ENVUP_STATE_DIR, defaulted here so the file still
-# stands alone; lib/manifest.sh is the one that really owns it)
+# Depends on: log.sh (which also defines $ENVUP_STATE_DIR, because this file
+# needs it and lib/manifest.sh — its real owner — loads later)
 # ============================================
 
 # ---- path resolution -----------------------------------------------------
@@ -92,6 +92,23 @@ paths_same() {
 
 # ---- safe symlink (always backs up a pre-existing real file) -------------
 ENVUP_BACKUP_DIR="${ENVUP_BACKUP_DIR:-$HOME/.dotfiles_backup/$(date +%Y%m%d_%H%M%S)}"
+
+# backup_path <dst> — where <dst> gets stashed inside $ENVUP_BACKUP_DIR.
+#
+# The backup mirrors the original path rather than flattening to a basename.
+# Flattening broke I1 outright: two link targets sharing a basename (a module
+# adding ~/.config/foo/config next to ~/.config/bar/config is all it takes) had
+# the second `mv` overwrite the first one's backup, and the user's file was
+# gone with no message. It also cost the one thing a backup is for — telling
+# you where the file came from, months later, from the backup alone.
+backup_path() {
+    local dst="$1" rel
+    # Paths outside $HOME keep their full shape under root/ so they stay
+    # distinguishable from a same-named file in $HOME.
+    if [[ "$dst" == "$HOME/"* ]]; then rel="${dst#"$HOME"/}"; else rel="root${dst}"; fi
+    printf '%s/%s' "$ENVUP_BACKUP_DIR" "$rel"
+}
+
 safe_link()          { _link "$1" "$2" required; }
 safe_link_optional() { _link "$1" "$2" optional; }
 _link() {
@@ -111,9 +128,10 @@ _link() {
     fi
     if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then log_info "[dry-run] link $dst -> $src"; return 0; fi
     if [[ -e "$dst" && ! -L "$dst" ]]; then            # back up a real file/dir
-        mkdir -p "$ENVUP_BACKUP_DIR"
-        mv "$dst" "$ENVUP_BACKUP_DIR/" || { log_error "backup failed: $dst"; return 1; }
-        log_info "backup: $dst -> $ENVUP_BACKUP_DIR/"
+        local bak; bak="$(backup_path "$dst")"
+        mkdir -p "${bak%/*}"
+        mv "$dst" "$bak" || { log_error "backup failed: $dst"; return 1; }
+        log_info "backup: $dst -> $bak"
     fi
     [[ -L "$dst" ]] && rm -f "$dst"
     mkdir -p "$(dirname "$dst")"
@@ -194,7 +212,7 @@ dir_prune_empty() {
 # file is reclaimed, and only while it is still empty. The ledger sits beside
 # the manifest for the same reason the manifest does: what exists here is a
 # fact about this machine, not about the repo two machines share.
-_created_ledger() { printf '%s/created' "${ENVUP_STATE_DIR:-$HOME/.local/state/envup}"; }
+_created_ledger() { printf '%s/created' "$ENVUP_STATE_DIR"; }
 
 created_note() {
     local f="$1" ledger; ledger="$(_created_ledger)"

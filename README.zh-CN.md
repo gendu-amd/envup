@@ -114,6 +114,8 @@ ENVUP_REQUIRE_CHECKSUM=1 ./envup install               # 校验不了的二进�
 
 envup 所有出网都收敛在一处（`lib/net.sh`），所以这些变量覆盖全部场景 —— release 下载、clone、厂商安装脚本都算。模块里出现裸 `curl` 是 lint 错误，就是为了保证这一点，`envup doctor --authoring` 会拦。
 
+`ENVUP_GH_MIRROR` 只改写 GitHub 自己的域名（github.com、raw/api/objects/codeload.githubusercontent.com）。厂商自有的安装地址（比如 atuin 的 `https://setup.atuin.sh`）原样放行 —— GitHub 代理服务不了它没听说过的域名，硬加前缀只会在最需要镜像的那批机器上 404。这类地址如果也进不去，用 `http_proxy` / `https_proxy`。
+
 `https_proxy` / `http_proxy` 在提权时会被保留（设了代理就用 `sudo -E`）—— 这是公司代理下 `apt-get install` 能成功的前提。
 
 git **子模块**用 git 自己的重定向：
@@ -241,11 +243,12 @@ $ envup adopt
 
 ## 核心保证
 
-- **备份而非覆盖**：`safe_link` 会先把目标处的真实文件移到 `~/.dotfiles_backup/<时间戳>/`。
+- **备份而非覆盖**：`safe_link` 会先把目标处的真实文件移到 `~/.dotfiles_backup/<时间戳>/`，并且**保留原来的相对路径**（`~/.config/git/ignore` 存成 `<备份>/.config/git/ignore`）。这样既能从备份本身看出文件原来在哪，两个同名文件也不会互相覆盖。
 - **幂等**：重复安装对已正确的软链是 no-op。
 - **可逆**：`unlink_safe`（即 `envup uninstall`）只删指向仓库内部的软链，绝不动你自己的文件。另外两样不是软链、但确实是 envup 造出来的东西也会一并收回：只为放一个软链而建的目录（仅在空目录时 `rmdir`），以及为了写 zsh shim 而不得不新建的 `~/.bashrc`（仅当"是 envup 建的"且"现在又空了"时才删）。你原本就有的 `~/.bashrc`、你后来往里写的内容、系统包、`~/.gitconfig.local` 都不动。
 - **跨平台**：自动识别平台、包管理器、架构、libc、权限、网络。
 - **卡不死**：网络与包管理器有超时，模块钩子有看门狗。
+- **有日志**：任何会改动机器的命令都会在 `$ENVUP_STATE_DIR/logs/` 留一份带时间戳的日志，`doctor`（尤其是 `--fix`）和 `adopt` 也在内。
 - **dry-run 是彻底的**：`ENVUP_DRY_RUN=1` / `--dry-run` 预览所有改动，provider 内部也一样。
 - **可降级**：这台机器装不上的东西被如实报告而不是致命错误，配置无论如何都会落地。
 

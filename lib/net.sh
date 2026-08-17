@@ -15,14 +15,26 @@
 # Depends on: log.sh, caps.sh
 # ============================================
 
+# The hosts a GitHub proxy actually fronts. Anything else is somebody's own
+# vendor domain and must be left alone — see gh_url.
+_GH_HOSTS='github.com|raw.githubusercontent.com|api.github.com|objects.githubusercontent.com|codeload.github.com|gist.githubusercontent.com'
+
 # gh_url <url> — rewrite a GitHub URL through a mirror/proxy when ENVUP_GH_MIRROR
 # is set, otherwise return it unchanged. ENVUP_GH_MIRROR is a proxy *prefix*
 # (e.g. https://ghproxy.com): the original URL is appended to it, which is the
 # common CN-mirror pattern and works for both `git clone` and raw downloads.
 # Unset => zero change to default behavior.
+#
+# Only GitHub hosts are rewritten. net_fetch and net_clone route *every* URL
+# through here — that is the single-door design — so an unconditional prefix
+# turned a vendor's own installer (atuin's https://setup.atuin.sh) into
+# https://mirror/https://setup.atuin.sh on exactly the machines that need a
+# mirror most. A GitHub proxy cannot serve a host it has never heard of.
 gh_url() {
     local u="$1"
     [[ -n "${ENVUP_GH_MIRROR:-}" ]] || { printf '%s' "$u"; return 0; }
+    # scheme-relative and bare git@ forms included: ssh never goes via a proxy.
+    [[ "$u" =~ ^https?://($_GH_HOSTS)(/|$) ]] || { printf '%s' "$u"; return 0; }
     printf '%s/%s' "${ENVUP_GH_MIRROR%/}" "$u"
 }
 
@@ -213,6 +225,70 @@ net_verify_file() {
     log_error "  expected $want"
     log_error "  got      $got"
     return 1
+}
+
+# net_sum_url <asset-url> <every asset url...> — pick the file in the same
+# release that vouches for the chosen asset. Sidecar first, because it is
+# unambiguous.
+net_sum_url() {
+    local asset="$1"; shift
+    local base="${asset##*/}" u b
+    for u in "$@"; do
+        b="${u##*/}"
+        if [[ "$b" == "$base".sha256 || "$b" == "$base".sha256sum \
+           || "$b" == "$base".sha512 || "$b" == "$base".sum ]]; then
+            printf '%s' "$u"; return 0
+        fi
+    done
+    # Otherwise one manifest for the whole release. goreleaser writes
+    # checksums.txt, neovim writes shasum.txt, fzf writes
+    # <name>_<version>_checksums.txt.
+    for u in "$@"; do
+        b="$(tr '[:upper:]' '[:lower:]' <<<"${u##*/}")"
+        case "$b" in
+            *checksums.txt|checksums|sha256sums*|sha256sum.txt|sha512sums*|shasum.txt)
+                printf '%s' "$u"; return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# Plenty of upstreams publish nothing — fd, bat and delta among them — so an
+# absent checksum cannot be fatal by default or those modules simply stop
+# installing. ENVUP_REQUIRE_CHECKSUM=1 makes it fatal, which is what you want
+# when ENVUP_GH_MIRROR points at a proxy you do not run.
+_net_unverified() {
+    local label="$1"
+    if [[ "${ENVUP_REQUIRE_CHECKSUM:-0}" == 1 ]]; then
+        log_error "[$label] $2, and ENVUP_REQUIRE_CHECKSUM=1"
+        return 1
+    fi
+    log_debug "[$label] not verified: $2"
+}
+
+# net_check_asset <label> <file> <asset-url> <tmpdir> <every asset url...>
+# Find the release's checksum manifest, fetch it, and compare. Returns 0 when
+# the file is trustworthy *or* when nothing could vouch for it and that is
+# allowed; non-zero only when the download should not be used.
+net_check_asset() {
+    local label="$1" file="$2" asset="$3" tmp="$4"; shift 4
+    local sumurl rc sums="$tmp/sums"
+
+    sumurl="$(net_sum_url "$asset" "$@")" \
+        || { _net_unverified "$label" "this release publishes no checksums"; return $?; }
+
+    # Quietly: a 404 on the sums file is a thing we handle, not a thing to
+    # print curl's opinion of.
+    if ! net_fetch "$sumurl" "$sums" >>"${ENVUP_LOG_FILE:-/dev/null}" 2>&1; then
+        _net_unverified "$label" "could not download $(basename "$sumurl")"; return $?
+    fi
+
+    net_verify_file "$file" "$sums" "$(basename "${asset%%\?*}")"; rc=$?
+    case "$rc" in
+        0) log_debug "[$label] $(basename "$file") matches $(basename "$sumurl")" ;;
+        1) return 1 ;;
+        *) _net_unverified "$label" "$(basename "$sumurl") had nothing usable for this asset"; return $? ;;
+    esac
 }
 
 # ---- git submodule plugins (zsh/tmux) ------------------------------------

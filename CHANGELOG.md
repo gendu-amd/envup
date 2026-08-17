@@ -267,6 +267,79 @@ changes — every addition is inert until you create the file that uses it.
   HEAD from a missing upstream is the entire thing being tested. Previously two
   files mentioned the command at all.
 
+### A wrong command line, a proxy, and a half-finished download
+
+A pass over the paths that only run when something is already going wrong — the
+ones you never exercise on the machine you developed on.
+
+- **No option can hang.** `envup upgrade --profile` with the value left off spun
+  forever: `shift 2` with a single argument remaining fails *without shifting*,
+  so `while (($#))` never advanced. envup's headline promise is that no step can
+  hang the whole run, and every network call is time-boxed to keep it — which
+  was worth very little while the argument loop could eat the process before any
+  of that machinery started. Every value-taking option now checks its value is
+  there and says which option is missing it. `tests/unit/cli.bats` runs the whole
+  option table under `timeout` so an option added later is covered by adding a
+  line to a list.
+- **A misspelt option is refused, not ignored.** `envup status --jsonn` printed
+  the human table, which is the worst available answer for a script that asked
+  for JSON; `envup clean --dry-runn` reported "no module: dry-runn", which sends
+  you looking for a module instead of at the flag you mistyped. `status`, `log`
+  and `clean` now name the unknown option.
+- **`ENVUP_GH_MIRROR` rewrites GitHub's hosts and nothing else.** Every URL in
+  the codebase goes through `gh_url` — that is the single-door design — and the
+  prefix was unconditional, so a vendor's own installer (atuin's
+  `https://setup.atuin.sh`) became `https://mirror/https://setup.atuin.sh` on
+  exactly the machines that need a mirror most. A GitHub proxy cannot serve a
+  host it has never heard of. The rewrite is now scoped to the six hosts a
+  GitHub proxy actually fronts, matched on the full host so
+  `github.com.evil.example` doesn't qualify, and `tests/unit/ghurl.bats` sweeps
+  every URL in `modules/*/meta.sh` to check each one is either left alone or
+  rewritten onto a real GitHub host.
+- **Backups keep the path they came from.** `$ENVUP_BACKUP_DIR` was keyed by
+  basename, so two link targets sharing one — a module adding
+  `~/.config/foo/config` next to `~/.config/bar/config` is all it takes — had the
+  second backup overwrite the first, and the user's file was gone with no
+  message. That is backup-never-clobber failing at the one job it has. Backups
+  now mirror the original path under the timestamped directory (paths outside
+  `$HOME` under `root/`), which also restores the other thing a backup is for:
+  telling you where the file came from, months later, from the backup alone.
+- **A tree install that fails leaves the previous version in place.** The
+  `GH_TREE` route did `rm -rf "$dest"` and *then* `mv`, and that `mv` crosses
+  filesystems — temp dir to `$HOME`, where mv does real copying and can run out
+  of space. A failure there left the working install deleted and nothing in its
+  place. It now stages beside the destination and swaps, restoring the old tree
+  if the swap fails: an upgrade cannot end with less than it started with.
+- **A release that drops a binary no longer leaves a dangling symlink on PATH.**
+  The previous version's link stayed, pointing into the tree that was just
+  replaced. That is worse than a missing command: `command -v` finds it, `envup
+  status` calls the module installed, and the exec fails naming a file that is
+  right there. Links into the module's own tree that no longer resolve are swept
+  after each install; links pointing anywhere else are left alone.
+- **`doctor` and `adopt` write a log.** `--fix` rebuilds links and drops manifest
+  orphans; `adopt` moves content between files and runs `git checkout --`. Every
+  other command that changes the machine left a timestamped log, and for a long
+  time the two repair commands — the ones you most need to explain afterwards —
+  were the exceptions. Logging starts after argument parsing, so `--help` still
+  writes nothing.
+- **`$ENVUP_STATE_DIR` honours `XDG_STATE_HOME`,** but never at the cost of
+  losing state already on disk: a machine already using `~/.local/state/envup`
+  keeps using it, so setting the variable later can't make an installed
+  environment look uninstalled.
+- **`envup upgrade --ref` completes tags and branches.** Pinning or rolling back
+  a release is the reason the flag exists, and the completion offered no values,
+  so you had to know the tag name by heart. It now reads them out of the
+  checkout. `tests/unit/cli.bats` also checks every long option each parser
+  accepts is offered by `completions/_envup`, against the parsers themselves
+  rather than a list somebody has to remember to update.
+- **`doctor --authoring` catches two more mistakes.** A misspelt contract field
+  (`VERIFY_MIN_VER`) used to be a variable nothing reads and no error — the
+  module simply had no version floor. And two modules can no longer both claim
+  the same `LINKS` destination, where the second install would silently take the
+  file from the first. The field list is read out of `_engine_load` rather than
+  copied, because a hand-synced copy goes stale in both directions: a new field
+  reported as a typo, and a typo accepted as a field.
+
 ### Internals
 
 - **`lib/upgrade.sh`** — the `git` half of `cmd_upgrade`, which had been two
@@ -282,6 +355,17 @@ changes — every addition is inert until you create the file that uses it.
   that skips files is worse than no guard, because it reads like coverage —
   `tests/unit/liblayout.bats` now asserts that every file in `lib/` appears in
   lint's output and that `lib.sh` sources each one by name.
+- **Asset integrity moved from `lib/providers/github_release.sh` to
+  `lib/net.sh`** as `net_sum_url` / `net_check_asset`. Checksum discovery and
+  verification is a property of downloading a file, not of one provider, and
+  leaving it there meant the next provider that fetches an artifact would either
+  reach across into another provider's private helpers or grow its own copy.
+- **`log_init` and `$ENVUP_STATE_DIR` have one definition each.** `log_init`
+  existed identically in `envup` and `lib/log.sh`; whichever the reader found
+  first was the one they'd edit. `$ENVUP_STATE_DIR` was defined in
+  `lib/manifest.sh`, which loads after `lib/fs.sh` needs it.
+- **`tests/unit/cli.bats`** — the dispatcher's argument handling had no tests at
+  all, which is how a hang lived in the option loop.
 
 ### Fixed
 
@@ -298,6 +382,13 @@ changes — every addition is inert until you create the file that uses it.
   `hosts/<hostname>` link produced a warning on every machine that wasn't that
   one. A missing optional source now logs at info level in `_link` too — absence
   is a fact there, not a fault.
+- **A module's `GIT_SETUP` no longer leaks into the next one.** `_engine_load`
+  reset every other contract field between modules but not this one, so a module
+  using the git provider after fzf would run fzf's setup command.
+- **`version_ge` no longer reads "0.9" as older than "0.9.0".** A trailing zero
+  component carries no information, but `sort -V` orders the shorter string
+  first — so a tool that reports two components against a three-component floor
+  was declared too old and reinstalled on every run.
 - `scripts/lint.sh` now covers `modules/*/files/bin/*`.
 - Added `docs/TMUX.md`, referenced from the README since 0.1.0 but never
   written.

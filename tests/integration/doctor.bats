@@ -99,6 +99,49 @@ _fixture() {   # _fixture <name> <meta.sh body>
     [[ "$output" == *"user data"* ]]
 }
 
+# A mistyped contract field is not an error anywhere: the engine reads the name
+# it knows, finds it empty, and skips that behaviour. The module looks correct
+# and quietly isn't — which is why this needs a linter and not a runtime check.
+@test "doctor: flags a meta.sh field the engine never reads" {
+    _fixture typo 'VERIFY_BIN="x"
+VERIFY_MIN_VER="1.0"'
+    run "$FAKE/envup" doctor --authoring --module typo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"VERIFY_MIN_VER"* ]]
+    [[ "$output" == *"nothing reads"* ]]
+}
+
+@test "doctor: a module-private field its own code reads is fine" {
+    _fixture privfield 'MY_PLUGINS=(a b)'
+    printf '#!/bin/bash\npost_install() { local p; for p in "${MY_PLUGINS[@]}"; do :; done; }\n' \
+        > "$FAKE/modules/privfield/hooks.sh"
+    run "$FAKE/envup" doctor --authoring --module privfield
+    [ "$status" -eq 0 ]
+}
+
+# The field list is read out of _engine_load, so adding a field to the contract
+# must not turn every module that uses it into a reported typo.
+@test "doctor: the contract field list matches what the engine actually resets" {
+    run "$FAKE/envup" doctor --authoring
+    [ "$status" -eq 0 ]
+    local f
+    for f in VERIFY_MIN_VERSION GH_ASSET_AVOID GIT_SETUP APPLIES_IF; do
+        grep -q "\b$f=" "$REPO_ROOT/lib/engine.sh" || { echo "not reset: $f"; return 1; }
+    done
+}
+
+# Whichever module installs second wins and the first one's config is simply
+# absent, with nothing reported. Only visible with every module in view, so it
+# runs on the whole-repo pass rather than per module.
+@test "doctor: flags two modules claiming the same link destination" {
+    _fixture claimer 'LINKS=("modules/claimer/files/x:$HOME/.contested")'
+    _fixture jumper  'LINKS=("modules/jumper/files/x:$HOME/.contested")'
+    run "$FAKE/envup" doctor --authoring
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"already claimed by"* ]]
+    [[ "$output" == *".contested"* ]]
+}
+
 @test "doctor: the real repo passes clean" {
     run "$REPO_ROOT/envup" doctor --authoring
     [ "$status" -eq 0 ]

@@ -244,6 +244,11 @@ EOF
         return $?
     fi
 
+    # --fix rebuilds links and drops manifest orphans, so this run has to leave
+    # the same record every other machine-changing command leaves. A plain
+    # health check logs too — a diagnosis is worth keeping next to the repair.
+    log_init doctor
+
     _DOC_ISSUES=0; _DOC_NOTES=0
     _doctor_env
     local env_notes=$_DOC_NOTES

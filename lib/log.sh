@@ -45,4 +45,29 @@ log_once() {
 }
 
 have() { command -v "$1" &>/dev/null; }
-pkg_have() { command -v "$1" &>/dev/null; }
+
+# ---- where per-machine state lives ---------------------------------------
+# One definition, used by the manifest, the created-file ledger, adopt's
+# stash and the command logs. It lives in the first-sourced file only because
+# lib/fs.sh needs it before lib/manifest.sh (which is its real owner) loads.
+#
+# XDG_STATE_HOME is honoured, but never at the cost of losing state that is
+# already on disk: a machine that has been using the historical path keeps
+# using it, so setting the variable later can't make an installed environment
+# look uninstalled.
+_envup_state_default() {
+    local legacy="$HOME/.local/state/envup"
+    if [[ -n "${XDG_STATE_HOME:-}" && ! -d "$legacy" ]]
+    then printf '%s/envup' "${XDG_STATE_HOME%/}"
+    else printf '%s' "$legacy"; fi
+}
+ENVUP_STATE_DIR="${ENVUP_STATE_DIR:-$(_envup_state_default)}"
+ENVUP_LOG_DIR="${ENVUP_LOG_DIR:-$ENVUP_STATE_DIR/logs}"
+
+# One timestamped log file per command (reused if already open).
+log_init() {
+    [[ "${ENVUP_LOG_FILE:-/dev/null}" != /dev/null ]] && return 0
+    mkdir -p "$ENVUP_LOG_DIR"
+    ENVUP_LOG_FILE="$ENVUP_LOG_DIR/$1_$(date +%Y%m%d_%H%M%S).log"; export ENVUP_LOG_FILE
+    log_info "log: $ENVUP_LOG_FILE"
+}

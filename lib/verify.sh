@@ -74,8 +74,15 @@ bin_version() {
 
 # version_ge <have> <want> — true when <have> is at least <want>.
 version_ge() {
-    [[ "$1" == "$2" ]] && return 0
-    [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$2" ]]
+    # A trailing zero component carries no information — 0.9 and 0.9.0 are the
+    # same version — but sort -V orders the shorter string first, so without
+    # this a tool reporting "0.9" reads as older than a floor of "0.9.0", the
+    # chain declares it too old, and the provider reinstalls what is there.
+    local a="$1" b="$2"
+    while [[ "$a" == *.0 ]]; do a="${a%.0}"; done
+    while [[ "$b" == *.0 ]]; do b="${b%.0}"; done
+    [[ "$a" == "$b" ]] && return 0
+    [[ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | head -1)" == "$b" ]]
 }
 
 # engine_verify — is the tool present and good enough? A module may replace this

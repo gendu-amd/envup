@@ -7,11 +7,12 @@ including the ones where you have an account and nothing else.
 envup                  # CLI: one cmd_* function per command + dispatch. A dispatcher.
 lib.sh                 # thin loader: sources lib/*.sh in dependency order
 lib/
-  log.sh               # logging + log levels
+  log.sh               # logging + log levels + where per-machine state lives
   caps.sh              # capability detection: OS/distro/arch/libc/privilege/network
   fs.sh                # _realpath, safe_link, unlink_safe, block_set/del,
                        # and the two reclaim paths: empty dirs, files envup made
-  net.sh               # gh_url, net_run, net_fetch, net_clone, offline handling
+  net.sh               # gh_url, net_run, net_fetch, net_clone, offline handling,
+                       # and release-checksum verification of what came back
   pkg.sh               # package-manager abstraction + cross-distro package names
   manifest.sh          # the manifest (schema 2: state/provider/version/time + repo root)
   module.sh            # meta reading, dependency resolution, profiles
@@ -109,14 +110,22 @@ strips `http_proxy`, and `apt-get install` fails on every corporate network.
 
 Every outbound request goes through `lib/net.sh` — releases, clones, vendor scripts.
 That single choke point is what makes `ENVUP_GH_MIRROR` and `ENVUP_OFFLINE` work
-everywhere at once, and what makes timeouts universal. `envup doctor --authoring`
+everywhere at once, and what makes timeouts universal. It also means `gh_url` sees
+URLs that have nothing to do with GitHub, so it rewrites only GitHub's own hosts —
+prefixing a GitHub proxy onto a vendor's installer produces an address no proxy
+can serve. `envup doctor --authoring`
 rejects a module that reaches for `curl`/`wget`/`git clone` on its own, precisely so
 the choke point stays a choke point.
 
 ## Key guarantees
 
 - **Backup, never clobber.** `safe_link` moves any pre-existing *real* file at a link
-  target into `~/.dotfiles_backup/<timestamp>/` before linking.
+  target into `~/.dotfiles_backup/<timestamp>/` before linking, keeping the path it
+  had under `$HOME` (`~/.config/git/ignore` → `<backup>/.config/git/ignore`).
+  Flattening to a basename made the guarantee conditional on no two link targets
+  ever sharing a name: the second `mv` overwrote the first one's backup, silently.
+  Mirroring the path also means the backup records where the file belongs, which
+  is the other half of what a backup is for.
 - **Idempotent.** Re-running install is a no-op for already-correct symlinks.
 - **Reversible.** `unlink_safe` only removes symlinks that point inside the repo.
   Ownership is decided by comparing paths **both resolved and unresolved** — on a

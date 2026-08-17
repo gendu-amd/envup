@@ -13,6 +13,35 @@
 # Depends on: log.sh, module.sh
 # ============================================
 
+# The contract's field list, read out of _engine_load rather than copied here.
+# A copy kept in sync by hand is a copy that goes stale, and this particular
+# staleness is silent in both directions: a new field would be reported as a
+# typo, and a typo would be accepted as a field.
+_authoring_fields() {
+    sed -n '/^_engine_load()/,/^}/p' "$_ENVUP_LIB/engine.sh" |
+        grep -oE '\b[A-Z][A-Z0-9_]*=' | tr -d '='
+}
+
+# Fields meta.sh sets that the engine has never heard of. `VERIFY_MIN_VER=1.0`
+# is not an error anywhere — the engine reads VERIFY_MIN_VERSION, finds it
+# empty, and skips the version gate. The module looks fine and silently isn't.
+#
+# A module may still define a field of its own (zsh's ZSH_PLUGINS, tmux's
+# TMUX_PLUGINS) as long as something in the module reads it back. What is left
+# after that rule is a name nothing anywhere uses, which can only be a mistake.
+_authoring_unknown_fields() {
+    local m="$1" dir="$2" known name n=0
+    known=" $(_authoring_fields | tr '\n' ' ')"
+    while IFS= read -r name; do
+        [[ " $known " == *" $name "* ]] && continue
+        grep -qE '\$\{?'"$name"'\b' "$dir"/meta.sh "$dir"/hooks.sh 2>/dev/null && continue
+        log_error "[$m] meta.sh sets $name, which nothing reads — misspelt contract field?"
+        n=$((n + 1))
+    done < <(grep -oE '^[[:space:]]*(declare[[:space:]]+-[a-zA-Z]+[[:space:]]+)?[A-Z][A-Z0-9_]*\+?=' "$dir/meta.sh" |
+             sed 's/^[[:space:]]*//; s/^declare[[:space:]]*-[a-zA-Z]*[[:space:]]*//; s/+*=$//' | sort -u)
+    return "$n"
+}
+
 # authoring_module <mod> — prints the number of issues found; logs each one.
 authoring_module() {
     local m="$1" dir="$ENVUP_HOME/modules/$1" n=0 f d p e src
@@ -85,6 +114,31 @@ authoring_module() {
         esac
     done < <(module_meta "$m" CLEAN_PATHS)
 
+    _authoring_unknown_fields "$m" "$dir" || n=$((n + $?))
+
+    echo "$n"
+}
+
+# Two modules linking different sources to the same destination: whichever
+# installs second wins, and the loser's config is simply absent with nothing
+# reported. It is also the one way to hit the backup collision lib/fs.sh guards
+# against. A repo-level fact, so it needs every module in view at once — a run
+# restricted to one module cannot see it.
+authoring_links_unique() {
+    local -A owner=(); local m e dst n=0
+    for m in $(modules_available); do
+        while IFS= read -r e; do
+            [[ -n "$e" ]] || continue
+            e="${e#\?}"; dst="${e#*:}"
+            [[ "$dst" == "$e" ]] && continue          # malformed; reported already
+            if [[ -n "${owner[$dst]:-}" && "${owner[$dst]}" != "$m" ]]; then
+                log_error "[$m] LINKS destination already claimed by ${owner[$dst]}: $dst"
+                n=$((n + 1))
+            else
+                owner[$dst]="$m"
+            fi
+        done < <(module_meta "$m" LINKS)
+    done
     echo "$n"
 }
 
@@ -95,9 +149,13 @@ authoring_main() {
 
     local total=0 m one
     for m in "${mods[@]}"; do
+        # authoring_module reports its count on stdout, so every message it
+        # logs has to go to stderr. log_error and log_warn already do; keep it
+        # that way if you add one.
         one="$(authoring_module "$m")"
         total=$((total + one))
     done
+    (( $# )) || total=$((total + $(authoring_links_unique)))
 
     echo
     if (( total )); then

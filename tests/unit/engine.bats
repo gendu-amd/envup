@@ -46,6 +46,18 @@ mk_hooks() { printf '#!/bin/bash\n%s\n' "$2" > "$ENVUP_HOME/modules/$1/hooks.sh"
     ! version_ge 0.9.5 0.10
 }
 
+# The same version written to different depths. sort -V puts the shorter string
+# first, so this used to read "0.9 is older than 0.9.0" and send a perfectly
+# good tool back through the install chain.
+@test "version_ge: trailing zero components do not change the version" {
+    version_ge 0.9 0.9.0
+    version_ge 0.9.0 0.9
+    version_ge 1 1.0.0
+    version_ge 1.0.0 1
+    ! version_ge 1.2 1.2.1
+    version_ge 1.20 1.2
+}
+
 @test "version_ge: equal versions satisfy the floor" {
     version_ge 1.2.3 1.2.3
 }

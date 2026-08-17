@@ -197,6 +197,79 @@ EOF
     [ ! -e "$ENVUP_LOCAL_BIN/fixture" ]
 }
 
+# ---- github_release: installing a whole tree (GH_TREE) -------------------
+#
+# nvim ships as a prefix rather than a bare binary, so this path replaces a
+# directory that is already in use. Both tests below are about the moment of
+# replacement, which is the only moment an upgrade can leave you worse off than
+# before you ran it.
+
+# mk_release <dir> <bin>... — an extracted archive with a single top directory.
+mk_release() {
+    local d="$1"; shift
+    mkdir -p "$d/pkg/bin"
+    local b
+    for b in "$@"; do printf '#!/bin/sh\necho %s\n' "$b" > "$d/pkg/bin/$b"; chmod +x "$d/pkg/bin/$b"; done
+}
+
+@test "_ghr_place_tree: installs the tree and links its binaries" {
+    mk_release "$TEST_TMP/x" nvim
+    run _ghr_place_tree "$TEST_TMP/x"
+    [ "$status" -eq 0 ]
+    [ -x "$ENVUP_LOCAL_OPT/fixture/bin/nvim" ]
+    [ -L "$ENVUP_LOCAL_BIN/nvim" ]
+}
+
+# It used to `rm -rf "$dest"` and only then mv. The mv crosses filesystems —
+# temp dir to $HOME — which is exactly where mv does a real copy and can fail
+# on space or permissions, and the old install was already gone by then.
+@test "_ghr_place_tree: a failed install leaves the previous version in place" {
+    mk_release "$TEST_TMP/x" nvim
+    _ghr_place_tree "$TEST_TMP/x"
+    echo "v1" > "$ENVUP_LOCAL_OPT/fixture/marker"
+
+    mk_release "$TEST_TMP/y" nvim
+    # Make the final swap-in fail, after the new tree has been staged.
+    mv() { [[ "$2" == "$ENVUP_LOCAL_OPT/fixture" && "$1" == *.new.* ]] && return 1; command mv "$@"; }
+    run _ghr_place_tree "$TEST_TMP/y"
+    unset -f mv
+
+    [ "$status" -ne 0 ]
+    [ -f "$ENVUP_LOCAL_OPT/fixture/marker" ]
+    [ -x "$ENVUP_LOCAL_OPT/fixture/bin/nvim" ]
+}
+
+@test "_ghr_place_tree: no staging leftovers after a successful install" {
+    mk_release "$TEST_TMP/x" nvim
+    _ghr_place_tree "$TEST_TMP/x"
+    run bash -c 'ls -d "$ENVUP_LOCAL_OPT"/fixture.* 2>/dev/null'
+    [ -z "$output" ]
+}
+
+# `command -v` finds a dangling symlink, so envup would call the tool installed
+# and the shell would report "not found" for a file that is right there.
+@test "_ghr_place_tree: a binary the new release dropped stops being on PATH" {
+    mk_release "$TEST_TMP/x" nvim nvim-qt
+    _ghr_place_tree "$TEST_TMP/x"
+    [ -L "$ENVUP_LOCAL_BIN/nvim-qt" ]
+
+    mk_release "$TEST_TMP/y" nvim
+    run _ghr_place_tree "$TEST_TMP/y"
+    [ "$status" -eq 0 ]
+    [ -L "$ENVUP_LOCAL_BIN/nvim" ]
+    [ ! -e "$ENVUP_LOCAL_BIN/nvim-qt" ]
+    [ ! -L "$ENVUP_LOCAL_BIN/nvim-qt" ]
+}
+
+@test "_ghr_place_tree: someone else's link into ~/.local/bin is left alone" {
+    mkdir -p "$ENVUP_LOCAL_BIN"
+    ln -s "/nowhere/at/all" "$ENVUP_LOCAL_BIN/unrelated"
+    mk_release "$TEST_TMP/x" nvim
+    run _ghr_place_tree "$TEST_TMP/x"
+    [ "$status" -eq 0 ]
+    [ -L "$ENVUP_LOCAL_BIN/unrelated" ]
+}
+
 # ---- rc-file shielding ---------------------------------------------------
 
 @test "_script_shield: an envup-owned rc file is swapped aside and restored" {

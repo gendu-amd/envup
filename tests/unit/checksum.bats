@@ -196,7 +196,7 @@ ASSET="https://github.com/o/r/releases/download/v1/tool-x86_64-linux.tar.gz"
 
 @test "the sidecar wins over the release-wide manifest" {
     # It cannot be about a different asset, so there is nothing to get wrong.
-    run _ghr_sum_url "$ASSET" \
+    run net_sum_url "$ASSET" \
         "https://github.com/o/r/releases/download/v1/checksums.txt" \
         "$ASSET" \
         "$ASSET.sha256"
@@ -204,32 +204,32 @@ ASSET="https://github.com/o/r/releases/download/v1/tool-x86_64-linux.tar.gz"
 }
 
 @test "goreleaser's checksums.txt is found" {
-    run _ghr_sum_url "$ASSET" "$ASSET" \
+    run net_sum_url "$ASSET" "$ASSET" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
     [[ "$output" == *checksums.txt ]]
 }
 
 @test "fzf's <name>_<version>_checksums.txt is found" {
-    run _ghr_sum_url "$ASSET" "$ASSET" \
+    run net_sum_url "$ASSET" "$ASSET" \
         "https://github.com/o/r/releases/download/v1/fzf_0.74.2_checksums.txt"
     [[ "$output" == *fzf_0.74.2_checksums.txt ]]
 }
 
 @test "neovim's shasum.txt is found" {
-    run _ghr_sum_url "$ASSET" "$ASSET" \
+    run net_sum_url "$ASSET" "$ASSET" \
         "https://github.com/o/r/releases/download/v1/shasum.txt"
     [[ "$output" == *shasum.txt ]]
 }
 
 @test "a release that publishes nothing reports nothing" {
-    run _ghr_sum_url "$ASSET" "$ASSET" \
+    run net_sum_url "$ASSET" "$ASSET" \
         "https://github.com/o/r/releases/download/v1/tool-aarch64-linux.tar.gz"
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
 
 @test "another asset's sidecar is not mistaken for ours" {
-    run _ghr_sum_url "$ASSET" "$ASSET" \
+    run net_sum_url "$ASSET" "$ASSET" \
         "https://github.com/o/r/releases/download/v1/tool-aarch64-linux.tar.gz.sha256"
     [ "$status" -ne 0 ]
 }
@@ -239,14 +239,14 @@ ASSET="https://github.com/o/r/releases/download/v1/tool-x86_64-linux.tar.gz"
 @test "an upstream with no checksums still installs" {
     # fd, bat and delta publish none. Refusing them by default would trade a
     # real capability for a guarantee we cannot offer anyway.
-    run _ghr_unverified "this release publishes no checksums"
+    run _net_unverified gh "this release publishes no checksums"
     [ "$status" -eq 0 ]
 }
 
 @test "ENVUP_REQUIRE_CHECKSUM=1 turns that into a refusal" {
     # For the case the default cannot cover: ENVUP_GH_MIRROR pointed at a proxy
     # you do not run.
-    ENVUP_REQUIRE_CHECKSUM=1 run _ghr_unverified "this release publishes no checksums"
+    ENVUP_REQUIRE_CHECKSUM=1 run _net_unverified gh "this release publishes no checksums"
     [ "$status" -ne 0 ]
     [[ "$output" == *"ENVUP_REQUIRE_CHECKSUM"* ]]
 }
@@ -267,7 +267,7 @@ fake_fetch() {
 @test "the download is checked before anything is unpacked" {
     printf '%s  payload.tar.gz\n' "$GOOD" > "$TEST_TMP/served"
     fake_fetch
-    run _ghr_check "$FILE" \
+    run net_check_asset gh "$FILE" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" "$TEST_TMP" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
@@ -277,7 +277,7 @@ fake_fetch() {
 @test "a file that is not what the release says is refused" {
     printf '%s  payload.tar.gz\n' "$BAD" > "$TEST_TMP/served"
     fake_fetch
-    run _ghr_check "$FILE" \
+    run net_check_asset gh "$FILE" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" "$TEST_TMP" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
@@ -287,7 +287,7 @@ fake_fetch() {
 @test "a checksum file that will not download is not a failed install" {
     rm -f "$TEST_TMP/served"
     fake_fetch
-    run _ghr_check "$FILE" \
+    run net_check_asset gh "$FILE" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" "$TEST_TMP" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
@@ -297,7 +297,7 @@ fake_fetch() {
 @test "…unless you asked for checksums to be mandatory" {
     rm -f "$TEST_TMP/served"
     fake_fetch
-    ENVUP_REQUIRE_CHECKSUM=1 run _ghr_check "$FILE" \
+    ENVUP_REQUIRE_CHECKSUM=1 run net_check_asset gh "$FILE" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" "$TEST_TMP" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
@@ -312,7 +312,7 @@ fake_fetch() {
     # real pass.
     printf '%s  payload.tar.gz\n' "$GOOD" > "$TEST_TMP/served"
     fake_fetch
-    ENVUP_REQUIRE_CHECKSUM=1 run _ghr_check "$FILE" \
+    ENVUP_REQUIRE_CHECKSUM=1 run net_check_asset gh "$FILE" \
         "https://github.com/o/r/releases/download/v1/payload.tar.gz?token=abc" "$TEST_TMP" \
         "https://github.com/o/r/releases/download/v1/checksums.txt"
     [ "$status" -eq 0 ]

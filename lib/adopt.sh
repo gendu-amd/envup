@@ -73,6 +73,10 @@ EOF
         log_error "adopt needs $ENVUP_HOME to be a git checkout"; return 1
     fi
 
+    # Moves content between files and runs `git checkout --`; that belongs in
+    # the log alongside install and upgrade.
+    log_init adopt
+
     local -a rows=(); mapfile -t rows < <(health_drift)
     if (( ${#rows[@]} == 0 )); then
         log_success "no drift: every managed file matches the repo"

@@ -408,8 +408,8 @@ used, all of them adjustable:
 Key properties:
 
 - **Idempotent**: Re-running `./envup install` is safe. Existing symlinks are detected and skipped.
-- **Reversible**: Every overwritten file is backed up to `~/.dotfiles_backup/<timestamp>/`. `./envup uninstall` removes only envup-managed symlinks — plus the two things it created that aren't symlinks: a directory that exists only to hold one (removed only while empty), and a `~/.bashrc` that envup itself had to create for the zsh shim (removed only if envup created it *and* it is empty again). Your files, your packages and your `~/.gitconfig.local` are never touched.
-- **Loggable**: Every command writes a timestamped log under `~/.local/state/envup/logs/`. Use `./envup log --tail` to follow live.
+- **Reversible**: Every overwritten file is backed up to `~/.dotfiles_backup/<timestamp>/`, under the same path it had in `$HOME` (so `~/.config/git/ignore` becomes `<backup>/.config/git/ignore` — the backup says where it came from, and two files sharing a basename can't overwrite each other's backup). `./envup uninstall` removes only envup-managed symlinks — plus the two things it created that aren't symlinks: a directory that exists only to hold one (removed only while empty), and a `~/.bashrc` that envup itself had to create for the zsh shim (removed only if envup created it *and* it is empty again). Your files, your packages and your `~/.gitconfig.local` are never touched.
+- **Loggable**: Every command writes a timestamped log under `~/.local/state/envup/logs/` — including `doctor` and `adopt`, which change the machine too. Use `./envup log --tail` to follow live.
 - **Cross-platform**: macOS, Linux (apt/dnf/yum/pacman/brew/apk), WSL2, Docker. Auto-detects the platform and package manager.
 - **Degradable**: what can't be installed here is reported, not fatal — and the config lands either way.
 
@@ -421,9 +421,10 @@ envup recognises these env vars at install time. All are optional; defaults are 
 |---|---|---|
 | `ENVUP_DRY_RUN` | `0` | When `1`, every destructive step prints what it would do without changing anything. `--dry-run` sets this automatically. |
 | `ENVUP_OFFLINE` | `0` | When `1`, no network is attempted at all — downloads decline immediately instead of waiting for a timeout, and configs are still linked. |
-| `ENVUP_GH_MIRROR` | — | Prefix that all GitHub traffic is routed through, e.g. `https://ghproxy.com`. Covers releases, clones and vendor install scripts. |
+| `ENVUP_GH_MIRROR` | — | Prefix that GitHub traffic is routed through, e.g. `https://ghproxy.com`. Covers releases, clones and raw files. Only GitHub hosts are rewritten — a vendor's own installer URL is left alone, since a GitHub proxy can't serve a host it has never heard of. |
 | `ENVUP_REQUIRE_CHECKSUM` | `0` | When `1`, a release binary that can't be checked against a published digest is refused instead of installed. Off by default because several upstreams (fd, bat, delta) publish no checksums at all. Worth turning on with `ENVUP_GH_MIRROR`. |
 | `ENVUP_LOCAL_BIN` | `~/.local/bin` | Where root-free installs put binaries. |
+| `ENVUP_STATE_DIR` | `~/.local/state/envup` | Manifest, logs and adopt's stash. Honours `XDG_STATE_HOME` — but only on a machine that isn't already using the default path, so setting it later can't make an installed environment look uninstalled. |
 | `ENVUP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` — terminal verbosity. The log file always records everything. |
 | `ENVUP_MODULE_TIMEOUT` | `900` | Outer watchdog around each module hook. A hung module is killed and reported failed; the run continues. |
 | `ENVUP_NVIM_LAZY` | `restore` | `restore` installs the pinned versions from `lazy-lock.json`; `sync` updates to latest and rewrites the lock; `skip` leaves them for nvim's first launch. |
@@ -448,17 +449,19 @@ docker run -it --rm ubuntu:24.04 bash -c '
 
 If a link target is an existing **real file** (e.g. a `~/.zshrc` you wrote by
 hand), envup **always backs it up** to `~/.dotfiles_backup/<timestamp>/` before
-creating the symlink — it never silently overwrites your files. To restore one,
-move it back from that directory.
+creating the symlink — it never silently overwrites your files. The backup
+mirrors the original path (`~/.config/nvim` lands at `<backup>/.config/nvim`),
+so restoring one is a `mv` back to the matching place, and nothing outside
+`$HOME` can collide with something inside it.
 
 ## Logs and Troubleshooting
 
 ```bash
-./envup log              # show the latest log (install/uninstall/upgrade/clean)
+./envup log              # show the latest log (any command that changes the machine)
 ./envup log --tail       # follow live (useful for long installs)
 
 # Logs persist at:
-ls ~/.local/state/envup/logs/
+ls ~/.local/state/envup/logs/     # $ENVUP_STATE_DIR/logs, if you moved it
 ```
 
 **Start with `envup doctor`.** It checks the machine, names what is wrong, and

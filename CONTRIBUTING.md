@@ -98,7 +98,7 @@ Every `lib/` helper is available. Use them instead of raw commands:
 | `created_note <file>` / `created_reclaim <file>` | record that envup created a file it does not own, and later delete it — but only if it is still empty. `block_set`/`block_del` do this for you |
 | `net_run "<desc>" -- <cmd>...` | run a network command with a timeout |
 | `net_fetch <url> [dst]` / `net_clone <url> <dst>` | download / clone through the mirror, proxy, offline check and timeout |
-| `gh_url <url>` | rewrite a GitHub URL through `ENVUP_GH_MIRROR` |
+| `gh_url <url>` | rewrite a GitHub URL through `ENVUP_GH_MIRROR` (GitHub hosts only — a vendor's own domain is returned unchanged) |
 | `priv_run <cmd>...` | run with elevated privilege **if** it's available without a password |
 | `block_set <file> <tag>` / `block_del <file> <tag>` | idempotently insert/remove a marker-delimited block in a file you append to but don't own (e.g. `~/.bashrc`); content on stdin |
 | `submodule_ensure <mod> <dir>...` | init git-submodule plugins + verify they're non-empty (zsh/tmux) |
@@ -141,7 +141,11 @@ no change to `envup` or `lib/` is needed.
   available without a password, take another route or degrade.
 - `envup doctor --authoring` must pass. It catches leftover v1 `install.sh`
   files, hand-rolled downloads, unknown providers, executable statements in
-  `meta.sh`, and `CLEAN_PATHS` that would delete user data.
+  `meta.sh`, `CLEAN_PATHS` that would delete user data, two modules claiming the
+  same link destination, and a `meta.sh` field nothing reads — a mistyped
+  `VERIFY_MIN_VERSION` is not an error anywhere, the engine just skips the
+  version gate and the module looks fine. The list of legitimate fields is read
+  out of `_engine_load`, so adding one to the contract needs no change here.
 - Test with `--dry-run` against a throwaway `HOME`:
 
 ```bash
@@ -178,7 +182,10 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   `liblayout` (that the loader and the lint size budget both still cover every
   file in `lib/`), `manifest`, `health`, `doctor`, `adopt`, `upgrade` (which
   builds a real local origin and clone rather than stubbing git, because
-  telling a dirty tree from a detached HEAD is the whole point), and
+  telling a dirty tree from a detached HEAD is the whole point), `cli` (the
+  dispatcher's argument handling: that no option can hang the parser, that a
+  misspelt one is refused rather than ignored, and that the zsh completion
+  still offers every option the parsers accept), and
   `zshconfig` (which starts real interactive zsh shells to assert slice order,
   PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
   change these. Several cover shipped config rather than library code:

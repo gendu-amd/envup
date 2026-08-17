@@ -208,10 +208,24 @@ _ghr_place_tree() {
     sub="$(find "$d" -mindepth 1 -maxdepth 1 -print 2>/dev/null)"
     [[ "$(wc -l <<<"$sub")" == 1 && -d "$sub" ]] && root="$sub"
 
-    local dest="$ENVUP_LOCAL_OPT/$NAME"
+    local dest="$ENVUP_LOCAL_OPT/$NAME" new="$dest.new.$$" old="$dest.old.$$"
     mkdir -p "$ENVUP_LOCAL_OPT" "$ENVUP_LOCAL_BIN"
-    rm -rf "$dest"
-    mv "$root" "$dest" || { log_error "[$NAME] could not install into $dest"; return 1; }
+    rm -rf "$new" "$old"
+
+    # Stage first, then swap. This used to `rm -rf "$dest"` and *then* mv, so a
+    # mv that failed — and this one crosses filesystems, from a temp dir to
+    # $HOME, which is where mv does real copying and can run out of space —
+    # left the working install deleted and nothing in its place. An upgrade
+    # must not be able to end with less than it started with.
+    mv "$root" "$new" || { rm -rf "$new"; log_error "[$NAME] could not stage $dest"; return 1; }
+    if [[ -e "$dest" ]]; then
+        mv "$dest" "$old" || { rm -rf "$new"; log_error "[$NAME] could not replace $dest"; return 1; }
+    fi
+    if ! mv "$new" "$dest"; then
+        [[ -e "$old" ]] && mv "$old" "$dest"
+        rm -rf "$new"; log_error "[$NAME] could not install into $dest"; return 1
+    fi
+    rm -rf "$old"
 
     local f n=0
     for f in "$dest"/bin/*; do
@@ -219,67 +233,19 @@ _ghr_place_tree() {
         ln -sf "$f" "$ENVUP_LOCAL_BIN/$(basename "$f")" && n=$((n + 1))
     done
     (( n )) || { log_error "[$NAME] $dest has no bin/ to link"; return 1; }
+
+    # A release that drops a binary leaves the previous version's symlink
+    # pointing into the tree we just replaced. A dangling symlink on PATH is
+    # worse than a missing command: `command -v` finds it, `envup status` calls
+    # it installed, and the exec fails with a "not found" naming a file that is
+    # right there.
+    local l
+    for l in "$ENVUP_LOCAL_BIN"/*; do
+        [[ -L "$l" && ! -e "$l" ]] || continue
+        [[ "$(readlink "$l")" == "$dest"/* ]] || continue
+        rm -f "$l" && log_debug "[$NAME] removed stale link $(basename "$l")"
+    done
     log_debug "[$NAME] linked $n binaries from $dest/bin"
-}
-
-# ---- integrity -----------------------------------------------------------
-# _ghr_sum_url <asset-url> <every asset url...> — something in the same release
-# that vouches for the chosen asset, sidecar first because it is unambiguous.
-_ghr_sum_url() {
-    local asset="$1"; shift
-    local base="${asset##*/}" u b
-    for u in "$@"; do
-        b="${u##*/}"
-        if [[ "$b" == "$base".sha256 || "$b" == "$base".sha256sum \
-           || "$b" == "$base".sha512 || "$b" == "$base".sum ]]; then
-            printf '%s' "$u"; return 0
-        fi
-    done
-    # Otherwise one manifest for the whole release. goreleaser writes
-    # checksums.txt, neovim writes shasum.txt, fzf writes
-    # <name>_<version>_checksums.txt.
-    for u in "$@"; do
-        b="$(tr '[:upper:]' '[:lower:]' <<<"${u##*/}")"
-        case "$b" in
-            *checksums.txt|checksums|sha256sums*|sha256sum.txt|sha512sums*|shasum.txt)
-                printf '%s' "$u"; return 0 ;;
-        esac
-    done
-    return 1
-}
-
-# Plenty of upstreams publish nothing — fd, bat and delta among them — so an
-# absent checksum cannot be fatal by default or those modules simply stop
-# installing. ENVUP_REQUIRE_CHECKSUM=1 makes it fatal, which is what you want
-# when ENVUP_GH_MIRROR points at a proxy you do not run.
-_ghr_unverified() {
-    if [[ "${ENVUP_REQUIRE_CHECKSUM:-0}" == 1 ]]; then
-        log_error "[$NAME] $1, and ENVUP_REQUIRE_CHECKSUM=1"
-        return 1
-    fi
-    log_debug "[$NAME] not verified: $1"
-}
-
-# _ghr_check <file> <asset-url> <tmpdir> <every asset url...>
-_ghr_check() {
-    local file="$1" asset="$2" tmp="$3"; shift 3
-    local sumurl rc sums="$tmp/sums"
-
-    sumurl="$(_ghr_sum_url "$asset" "$@")" \
-        || { _ghr_unverified "this release publishes no checksums"; return $?; }
-
-    # Quietly: a 404 on the sums file is a thing we handle, not a thing to
-    # print curl's opinion of.
-    if ! net_fetch "$sumurl" "$sums" >>"${ENVUP_LOG_FILE:-/dev/null}" 2>&1; then
-        _ghr_unverified "could not download $(basename "$sumurl")"; return $?
-    fi
-
-    net_verify_file "$file" "$sums" "$(basename "${asset%%\?*}")"; rc=$?
-    case "$rc" in
-        0) log_debug "[$NAME] $(basename "$file") matches $(basename "$sumurl")" ;;
-        1) return 1 ;;
-        *) _ghr_unverified "$(basename "$sumurl") had nothing usable for this asset"; return $? ;;
-    esac
 }
 
 # ---- the provider --------------------------------------------------------
@@ -324,7 +290,7 @@ provider_github_release() {
         rm -rf "$tmp"; log_error "[$NAME] download failed: $asset"; return 1
     fi
 
-    if ! _ghr_check "$file" "$asset" "$tmp" "${urls[@]}"; then
+    if ! net_check_asset "$NAME" "$file" "$asset" "$tmp" "${urls[@]}"; then
         rm -rf "$tmp"
         log_hint "a mirror can hand back a stale or truncated file — retry without ENVUP_GH_MIRROR, or pin a known-good tag in versions.lock"
         return 1

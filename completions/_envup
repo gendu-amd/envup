@@ -31,12 +31,29 @@ _envup() {
         subcmd) _describe -t commands 'envup command' subcommands ;;
         args)
             case $words[1] in
-                install|upgrade)
+                install)
                     _arguments \
                         '--profile[Use a profile]:profile:('"${_profiles[*]}"')' \
                         '-p[Use a profile]:profile:('"${_profiles[*]}"')' \
                         '--dry-run[Preview]' '-n[Preview]' \
-                        '--keep-going[upgrade: continue if git pull fails]' \
+                        '--help[Show help]' \
+                        '*:module:('"${_modules[*]}"')'
+                    ;;
+                upgrade)
+                    # --ref takes a tag or a branch, and the repo already knows
+                    # which ones exist — offering the list is the difference
+                    # between pinning a release and guessing at its name.
+                    local -a _refs
+                    [[ -n "$_home" ]] && _refs=(${(f)"$(git -C "$_home" for-each-ref \
+                        --format='%(refname:short)' refs/tags refs/heads 2>/dev/null)"})
+                    _arguments \
+                        '--profile[Use a profile]:profile:('"${_profiles[*]}"')' \
+                        '-p[Use a profile]:profile:('"${_profiles[*]}"')' \
+                        '--ref[Check out a specific tag or branch]:ref:('"${_refs[*]}"')' \
+                        '-r[Check out a specific tag or branch]:ref:('"${_refs[*]}"')' \
+                        '--dry-run[Preview]' '-n[Preview]' \
+                        '--keep-going[Continue even if the source cannot be updated]' \
+                        '-k[Continue even if the source cannot be updated]' \
                         '--help[Show help]' \
                         '*:module:('"${_modules[*]}"')'
                     ;;
