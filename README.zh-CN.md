@@ -248,7 +248,7 @@ $ envup adopt
 - **可逆**：`unlink_safe`（即 `envup uninstall`）只删指向仓库内部的软链，绝不动你自己的文件。另外两样不是软链、但确实是 envup 造出来的东西也会一并收回：只为放一个软链而建的目录（仅在空目录时 `rmdir`），以及为了写 zsh shim 而不得不新建的 `~/.bashrc`（仅当"是 envup 建的"且"现在又空了"时才删）。你原本就有的 `~/.bashrc`、你后来往里写的内容、系统包、`~/.gitconfig.local` 都不动。
 - **跨平台**：自动识别平台、包管理器、架构、libc、权限、网络。
 - **卡不死**：网络与包管理器有超时，模块钩子有看门狗。
-- **有日志**：任何会改动机器的命令都会在 `$ENVUP_STATE_DIR/logs/` 留一份带时间戳的日志，`doctor`（尤其是 `--fix`）和 `adopt` 也在内。
+- **有日志**：任何会改动机器的命令都会在 `$ENVUP_STATE_DIR/logs/`（默认 `~/.local/state/envup/logs/`）留一份带时间戳的日志，`doctor`（尤其是 `--fix`）和 `adopt` 也在内。`ENVUP_STATE_DIR` 存放 manifest、日志和 adopt 的暂存，认 `XDG_STATE_HOME` —— 但只在这台机器还没在用默认路径时才认，免得你事后设了这个变量、一个装好的环境却显示成没装。
 - **dry-run 是彻底的**：`ENVUP_DRY_RUN=1` / `--dry-run` 预览所有改动，provider 内部也一样。
 - **可降级**：这台机器装不上的东西被如实报告而不是致命错误，配置无论如何都会落地。
 
