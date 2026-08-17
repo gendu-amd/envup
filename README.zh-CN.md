@@ -167,7 +167,9 @@ CLEAN_PATHS=()
 
 ### 在远端机器上干活
 
-tmux 模块里有两件事只在 SSH 场景下才有意义：
+tmux 模块里有三件事只在 SSH 场景下才有意义：
+
+**重启不会让你丢掉现场。** 你正在用的那套布局 —— 窗口、pane、各自的目录、回滚缓冲、nvim 里开着的文件 —— 每 5 分钟存一次，重新登录就直接回到那个状态。不用敲任何东西：登录 shell 会拉起 tmux server，等恢复跑完，然后 attach。存档按机器分开，所以 NFS 共用 home 时不会在 GPU 机器上给你恢复出编译机的布局。想要一个干净 shell 就 `NO_TMUX=1 ssh box`。见 [docs/TMUX.md](docs/TMUX.md)。
 
 **复制的东西落到你自己的电脑上。** 在 nvim 里 yank、或在 tmux 里复制，文字会经由你已经建好的那条 SSH 连接，进到你面前这台机器的剪贴板 —— 不需要 X11 转发、不需要 root、不需要额外的守护进程。但它需要你**本地终端**上的一个开关，这个 envup 管不到：见 [docs/CLIPBOARD.md](docs/CLIPBOARD.md)。（VS Code 和 Cursor 默认是关的。）
 

@@ -263,7 +263,7 @@ Adding a new tool = creating a new directory. No registry, no config update. See
 |--------|------|---------|
 | `zsh` | Modern shell with Oh-My-Zsh + Powerlevel10k (also makes zsh your default shell) | — |
 | `git` | Git config (delta as pager where delta is installed) | — |
-| `tmux` | Terminal multiplexer (new panes use zsh, `prefix f` project switcher, OSC 52 clipboard) | — |
+| `tmux` | Terminal multiplexer (new panes use zsh, `prefix f` project switcher, OSC 52 clipboard, session restored after a reboot) | — |
 | `fzf` | Fuzzy finder (Ctrl+T / Ctrl+R) | — |
 | `zoxide` | Smarter `cd` — `z <dir>` to jump, `zi` to pick | `zsh` |
 | `atuin` | SQLite-backed shell history | `zsh` |
@@ -271,7 +271,15 @@ Adding a new tool = creating a new directory. No registry, no config update. See
 
 ### Working on a remote box
 
-Two things the tmux module adds that only matter over SSH:
+Three things the tmux module adds that only matter over SSH:
+
+**A reboot does not cost you your session.** The layout you were working in —
+windows, panes, directories, scrollback, the files open in nvim — is saved every
+five minutes, and logging back in puts you straight back into it. Nothing to
+type: the login shell starts the tmux server, waits for the restore, and attaches.
+Saves are kept per machine, so a home directory shared over NFS does not hand you
+the build box's layout on the GPU box. `NO_TMUX=1 ssh box` for a connection where
+you want a plain shell. See [docs/TMUX.md](docs/TMUX.md).
 
 **Copy lands on your laptop.** Yank in nvim or copy in tmux and the text goes to the
 clipboard of the machine you are sitting at, carried by the SSH connection you

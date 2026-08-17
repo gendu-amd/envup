@@ -41,20 +41,73 @@ The copy goes out over OSC 52, so it works on any server without X11
 forwarding or root. It needs one setting in your terminal — see
 [docs/CLIPBOARD.md](CLIPBOARD.md).
 
-## Sessions that survive
+## Sessions that survive a reboot
 
-resurrect + continuum are configured, so the layout you were working in is saved
-every 15 minutes and restored when the tmux server next starts — including each
-pane's visible scrollback and your nvim sessions.
+The machine goes down — a kernel update, a power event, someone else's OOM. You
+log back in and your windows, panes, working directories, scrollback and open
+files are where you left them. You do not type anything to make that happen.
+
+Three pieces, and all three have to be there:
+
+| Piece | Does |
+|---|---|
+| tmux-resurrect | writes the session tree to a file |
+| tmux-continuum | saves every 5 minutes; restores when a tmux server starts |
+| `~/.zshrc.d/90-tmux.zsh` | starts that server when you log in |
 
 | Keys | Does |
 |---|---|
 | `prefix Ctrl-s` | save now |
 | `prefix Ctrl-r` | restore now |
 
-Saves live in `~/.local/share/tmux/resurrect/` — or `~/.tmux/resurrect/` if you
-still have one from an older setup, which resurrect keeps using. Either way not
-`/tmp`, so a reboot does not take them, and envup's `clean` never touches them.
+**Five minutes is the worst case.** That is the interval, so it is also the most
+layout an unplanned reboot can cost you. Nothing is saved on shutdown, because a
+machine going down does not stop to ask.
+
+**Saves are per machine:** `~/.local/share/tmux/resurrect/<hostname>/`. On a home
+directory shared over NFS the default single directory means every machine writes
+the same file and the last save wins — you log into the build box and it hands
+you the layout you left on the GPU box. Not `/tmp` either way, so a reboot does
+not take them, and envup's `clean` never touches them.
+
+### Logging in
+
+The login hook is the piece that was missing: without it your layout sat in a
+file waiting for you to remember to type `tmux`. On an interactive login it
+starts a server if none is running, waits for continuum's restore (which is
+asynchronous — creating a session too early would leave you in an empty shell
+with the real work restored behind it), and attaches.
+
+It stays out of the way when it should: not for `scp`/`rsync`/`ssh box cmd`, not
+inside an existing tmux or screen, not in VS Code's or Cursor's integrated
+terminal, and not when tmux is missing. It does not `exec`, so detaching leaves
+you in a normal shell and a broken tmux cannot lock you out of the machine.
+
+```bash
+NO_TMUX=1 ssh box            # just this connection
+```
+
+```bash
+# ~/.zshrc.d/hosts/<machine>.zsh — this machine, permanently
+ENVUP_TMUX_AUTOATTACH=0      # never
+ENVUP_TMUX_AUTOATTACH=1      # yes, even in an editor terminal
+ENVUP_TMUX_SESSION=work      # name for the session created when nothing restores
+ENVUP_TMUX_RESTORE_WAIT=8    # seconds to wait for a restore before giving up
+```
+
+### nvim panes
+
+A restored editor pane comes back with your buffers, splits and folds, not an
+empty nvim. nvim writes a `Session.vim` in the pane's directory once a minute
+while you work — on a timer rather than on exit, because a kernel that is going
+down does not run `VimLeavePre`, and an exit hook would save exactly the sessions
+you did not need.
+
+A clean quit deletes the file again, so it only lingers when nvim was killed —
+which is the case it exists for. envup's global gitignore covers `Session.vim`
+for the times a crash leaves one in a repository. It is only ever written inside
+tmux; turn it off entirely with `vim.g.envup_session = false` in
+`hosts/<machine>.lua`.
 
 ## `prefix f` — the sessionizer
 

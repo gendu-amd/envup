@@ -177,8 +177,12 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   change these. Three cover shipped config rather than library code:
   `hosts` (the per-machine layer across all four modules, and its load order),
   `gitconfig` (that the committed config names no binary, and the generated
-  `~/.gitconfig.envup` lifecycle), and `clipboard` (the OSC 52 settings, each of
-  which fails silently when wrong).
+  `~/.gitconfig.envup` lifecycle), `clipboard` (the OSC 52 settings, each of
+  which fails silently when wrong), and `tmuxrestore` (the login hook, the
+  per-machine resurrect directory, and nvim's `Session.vim`). `tmuxrestore`
+  runs the login hook on a real terminal via zsh's own `zsh/zpty` — a hook whose
+  job is to decide whether it is talking to a person cannot be tested from a
+  pipe, where every guard trips and every test passes for the wrong reason.
 - **Scripts under `modules/*/files/bin/`** are first-party sources: `lint.sh`
   covers them, and they get behavioural tests, not grep tests — see
   `tests/unit/sessionizer.bats`, which stubs `tmux` and `fzf` to exercise the

@@ -45,6 +45,39 @@ changes — every addition is inert until you create the file that uses it.
   write turned off** (`terminal.integrated.enableClipboardWrite`); the legacy
   conhost PowerShell window does not support it at all.
 
+### Sessions that survive a reboot
+
+- **Logging in restores what the reboot interrupted.** New zsh slice
+  `90-tmux.zsh`: on an interactive login it starts a tmux server if none is
+  running, waits for tmux-continuum's (asynchronous) restore rather than racing
+  it into an empty session, and attaches. resurrect and continuum were already
+  configured — the missing half was that after a reboot nothing ever started a
+  server, so the saved layout sat in a file waiting for you to remember it.
+  Guarded against every context where a multiplexer is wrong: no tty
+  (`scp`, `rsync`, `ssh box cmd`), already inside tmux or screen, an editor's
+  integrated terminal, no tmux installed. Escape hatches: `NO_TMUX=1` for one
+  connection, `ENVUP_TMUX_AUTOATTACH=0` for a machine. It does not `exec`, so a
+  tmux that refuses to start cannot lock you out of a box you can only reach
+  over SSH.
+- **One resurrect save directory per machine**
+  (`~/.local/share/tmux/resurrect/$HOSTNAME`). The default is a single shared
+  path, which on a home directory mounted over NFS means every machine writes
+  the same file and the last save wins — you log into the build box and it
+  restores the layout you left on the GPU box.
+- **`@continuum-save-interval` 15 → 5**, so an unplanned reboot costs at most
+  five minutes of window shuffling.
+- **`@resurrect-strategy-nvim 'session'` finally does something.** The strategy
+  restores a pane with `nvim -S` only when the pane's directory contains a
+  `Session.vim`, and nothing in this config ever wrote one — the setting had been
+  inert since the day it was added. New `lua/configs/session.lua` writes it on a
+  timer (a kernel going down does not run `VimLeavePre`, so an exit hook would
+  save every session except the ones this exists for), only inside tmux, and
+  deletes it on a clean quit so it does not accumulate in project directories.
+  Off with `vim.g.envup_session = false`.
+- New global gitignore at `~/.config/git/ignore` (a path git reads on its own,
+  no `core.excludesFile` to get wrong) covering `Session.vim` and `.nvimlog`,
+  for the crash that leaves one behind in a repository.
+
 ### Project switching
 
 - **`prefix f` / `ts`** — fzf over your project roots, then attach-or-create a
