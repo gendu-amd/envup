@@ -43,7 +43,7 @@ cd envup
 # Forgot --recursive? Catch up:
 #   git submodule update --init --recursive
 
-# Install the standard profile (zsh, git, tmux, fzf, zoxide, atuin)
+# Install the standard profile (zsh, git, tmux, fzf, ripgrep, fd, zoxide, atuin, delta)
 ./envup install
 
 # ... or pick a smaller profile
@@ -62,7 +62,7 @@ A server where you have an account and nothing else:
 
 ```console
 $ ./envup install --profile standard
-[i] install order: zsh git tmux fzf zoxide atuin
+[i] install order: zsh git tmux fzf ripgrep fd zoxide atuin delta
 ==> [zsh] install
 ✓ linked: ~/.zshrc
 ...
@@ -70,7 +70,7 @@ $ ./envup install --profile standard
 [i] [zoxide] release v0.9.6: zoxide-x86_64-unknown-linux-musl.tar.gz
 ✓ [zoxide] zoxide v0.9.6 installed to ~/.local/bin
 
-✓ ok:       zsh git fzf zoxide atuin
+✓ ok:       zsh git fzf ripgrep fd zoxide atuin delta
 ⚠ degraded: tmux (usable but incomplete — see above)
 
 $ ./envup status
@@ -197,7 +197,7 @@ handles both:
 | Profile | Modules | Use case |
 |---------|---------|----------|
 | `minimal` | `zsh git` | Bare server, headless container |
-| `standard` (default) | `+ tmux fzf zoxide atuin` | Typical developer workstation |
+| `standard` (default) | `+ tmux fzf ripgrep fd zoxide atuin delta` | Typical developer workstation |
 | `full` | `+ nvim` | Power-user workstation |
 
 Profiles are just bash files at [`profiles/`](profiles/) — easy to read, easy to add your own:
@@ -218,7 +218,7 @@ MODULES+=(zsh git)
 
 # profiles/standard.sh  (default) = minimal + terminal tooling
 use_profile minimal
-MODULES+=(tmux fzf zoxide atuin)
+MODULES+=(tmux fzf ripgrep fd zoxide atuin delta)
 
 # profiles/full.sh = standard + editor
 use_profile standard
@@ -263,8 +263,11 @@ Adding a new tool = creating a new directory. No registry, no config update. See
 |--------|------|---------|
 | `zsh` | Modern shell with Oh-My-Zsh + Powerlevel10k (also makes zsh your default shell) | — |
 | `git` | Git config (delta as pager where delta is installed) | — |
+| `delta` | Syntax-highlighted git diffs, wired in as git's pager | `git` |
 | `tmux` | Terminal multiplexer (new panes use zsh, `prefix f` project switcher, OSC 52 clipboard, session restored after a reboot) | — |
 | `fzf` | Fuzzy finder (Ctrl+T / Ctrl+R) | — |
+| `ripgrep` | Fast recursive search (`rg`); also what Telescope greps with | — |
+| `fd` | Friendlier `find`; also what fzf lists files with | — |
 | `zoxide` | Smarter `cd` — `z <dir>` to jump, `zi` to pick | `zsh` |
 | `atuin` | SQLite-backed shell history | `zsh` |
 | `nvim` | Neovim with NvChad (plugins pinned via lazy-lock.json) | — |
@@ -338,6 +341,20 @@ every machine gets the same editor. Control it with `ENVUP_NVIM_LAZY`:
 
 `./envup clean nvim` clears plugin/cache state if it gets stuck; the next
 install restores from the lock.
+
+**Editing over SSH.** Three defaults chosen for the way a server actually gets
+used, all of them adjustable:
+
+- Undo survives the session (`undofile`). A dropped connection kills the shell
+  and nvim with it; without this, everything since the last write goes too.
+- Past 1.5 MB a buffer opens with syntax, treesitter, LSP, folding, undo and
+  swap switched off, and tells you it did. Tailing a 200 MB log stops being a
+  killed terminal. `vim.g.envup_bigfile_bytes = 0` disables it.
+- Format on save runs **only where the project ships its own style config**
+  (`.clang-format`, `stylua.toml`, `pyproject.toml`, …), because clang-format
+  with no `.clang-format` reflows the whole file to LLVM style — and in someone
+  else's repository, that diff is yours to explain. `<leader>fm` formats on
+  demand regardless; `vim.g.envup_format_always = true` makes it unconditional.
 
 ## How It Works
 

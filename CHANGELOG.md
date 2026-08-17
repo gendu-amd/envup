@@ -78,6 +78,57 @@ changes — every addition is inert until you create the file that uses it.
   no `core.excludesFile` to get wrong) covering `Session.vim` and `.nvimlog`,
   for the crash that leaves one behind in a repository.
 
+### Three tools the rest of the config assumed
+
+- **New modules: `ripgrep`, `fd`, `delta`** — all three in the `standard`
+  profile. They were already being *used*: fzf lists files with `fd` when it can
+  find it, nvim's Telescope greps with `rg`, and the git module has shipped a
+  `[delta]` section plus pager detection since 0.2.0. Nothing ever installed
+  them, so on a fresh machine each of those paths quietly took its fallback (or
+  did nothing at all) and looked like the feature was just slow, or missing.
+- Each is one static binary, so the no-root `github_release` route works and a
+  server where you have only an account gets the same tooling as a workstation.
+- **The naming, which is the whole difficulty.** The package is `ripgrep` and
+  the binary is `rg`; the package is `git-delta` (except on Alpine) and the
+  binary is `delta`; on Debian and Fedora the package is `fd-find` and the
+  binary is `fdfind`, because Debian gave `fd` to something else first. The fd
+  module links the distro's binary into `~/.local/bin/fd` on install and removes
+  that link on uninstall, so `fd` means `fd` everywhere.
+- Installing `delta` re-runs the git module's config generation, because git is
+  installed first and therefore wrote "no delta on this machine" before delta
+  existed. Without that, the pager only turned on at the *next* `envup install
+  git` — which is the kind of thing you never connect to the cause.
+
+### The editor, for the way a server actually gets used
+
+- **Undo survives the session** (`undofile`, 10 000 levels). An SSH connection
+  drops, the shell dies, nvim dies with it — and everything since the last write
+  used to be gone. History goes under `stdpath("state")`, keyed by full path, so
+  a home directory shared over NFS does not mix machines up.
+- **A big file no longer takes the editor down with it.** Past 1.5 MB
+  (`vim.g.envup_bigfile_bytes` to change it, `0` to disable) a buffer opens with
+  syntax, treesitter, LSP, folding, undo and swap switched off, and says so. The
+  decision is made on `BufReadPre`, before the highlighter has started, because
+  by `BufReadPost` the hang has already happened. Tailing a 200 MB log over SSH
+  is now boring instead of a killed terminal.
+- **Format on save — but only where the project says how.** conform.nvim now
+  covers lua, C/C++, python, shell, json, yaml and markdown, and runs on save
+  only when the project ships the matching style file (`.clang-format`,
+  `stylua.toml`, `pyproject.toml`, …). Unconditional formatting means your first
+  save in someone else's repository reflows the whole file to LLVM style and the
+  diff is yours to explain. `<leader>fm` still formats anything on demand;
+  `vim.g.envup_format_always = true` opts into the unconditional behaviour, and
+  `vim.b.disable_autoformat` / `vim.g.disable_autoformat` opt out. No LSP
+  fallback — that is the same surprise from a different binary.
+- conform is loaded on `BufWritePre` rather than lazily on some later event,
+  without which `format_on_save` was simply never consulted.
+- **Diagnostics you can read.** `]d` / `[d` move between problems and open the
+  full text in a float on arrival (`<leader>df` for the one under the cursor) —
+  the virtual text at the end of the line is truncated at the screen edge, and a
+  clangd template error does not fit. Nothing appears while you are still
+  typing. Both the 0.10 (`goto_next`) and 0.11 (`vim.diagnostic.jump`) APIs are
+  handled, since the NvChad pin here still supports 0.10.
+
 ### Project switching
 
 - **`prefix f` / `ts`** — fzf over your project roots, then attach-or-create a

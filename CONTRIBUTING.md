@@ -174,12 +174,16 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   symlinked-home cases), `manifest`, `health`, `doctor`, `adopt`, and
   `zshconfig` (which starts real interactive zsh shells to assert slice order,
   PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
-  change these. Three cover shipped config rather than library code:
+  change these. Several cover shipped config rather than library code:
   `hosts` (the per-machine layer across all four modules, and its load order),
   `gitconfig` (that the committed config names no binary, and the generated
   `~/.gitconfig.envup` lifecycle), `clipboard` (the OSC 52 settings, each of
-  which fails silently when wrong), and `tmuxrestore` (the login hook, the
-  per-machine resurrect directory, and nvim's `Session.vim`). `tmuxrestore`
+  which fails silently when wrong), `tmuxrestore` (the login hook, the
+  per-machine resurrect directory, and nvim's `Session.vim`), `searchtools`
+  (ripgrep / fd / delta, whose whole difficulty is that the package, the binary
+  and the module go by three different names), and `nvimconfig` (the editor
+  config as text — nothing there runs neovim, because the machines this repo
+  targets are exactly the ones where it may not start). `tmuxrestore`
   runs the login hook on a real terminal via zsh's own `zsh/zpty` — a hook whose
   job is to decide whether it is talking to a person cannot be tested from a
   pipe, where every guard trips and every test passes for the wrong reason.
