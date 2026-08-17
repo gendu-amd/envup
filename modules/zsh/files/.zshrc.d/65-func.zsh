@@ -28,6 +28,17 @@ extract() {
     fi
 }
 
+# Jump to a project: fzf over your project roots, then attach-or-create a tmux
+# session named after it. Same picker as `prefix + f` inside tmux; from outside
+# tmux it attaches instead of switching.
+#
+# Only defined if the name is free — moreutils also ships a `ts`, and silently
+# shadowing someone else's binary is how you lose an afternoon. The script is
+# always reachable under its full name.
+if [[ -x "$HOME/.local/bin/tmux-sessionizer" ]] && ! command -v ts >/dev/null 2>&1; then
+    ts() { "$HOME/.local/bin/tmux-sessionizer" "$@" }
+fi
+
 # Terminal size fix for SSH/tmux/Docker
 _update_terminal_size() {
     if command -v stty &>/dev/null; then

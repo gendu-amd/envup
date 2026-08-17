@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# tmux-sessionizer — pick a project, land in a tmux session named after it.
+#
+# The friction this removes: switching projects used to mean remembering which
+# numbered session you had put it in, or opening a new one and cd-ing back. Here
+# the session name *is* the project name, and picking an existing project
+# re-attaches instead of making a second copy of it.
+#
+#   tmux-sessionizer            fzf over every project root
+#   tmux-sessionizer <dir>      skip the picker, go straight there
+#
+# Bound to `prefix + f` inside tmux, and to `ts` in zsh. Works from outside tmux
+# too (it attaches rather than switching).
+set -uo pipefail
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/envup/project-dirs"
+
+# $ENVUP_TS_PAUSE is set by the tmux key binding, and only by it. A binding runs
+# in a throwaway window that tmux closes the instant the command exits, so an
+# error message would be on screen for a few milliseconds and the key would look
+# like it did nothing at all. From the shell (`ts`) there is no window to lose,
+# so it does not pause there.
+die() {
+    printf '%s\n' "tmux-sessionizer: $*" >&2
+    if [[ -n "${ENVUP_TS_PAUSE:-}" && -r /dev/tty ]]; then
+        printf 'press Enter to close this window...' >&2
+        read -r _ </dev/tty || true
+    fi
+    exit 1
+}
+
+# Where projects live, first source that answers:
+#
+#   $ENVUP_PROJECT_DIRS   colon-separated globs — escape hatch, and what the
+#                         tests use
+#   ~/.config/envup/project-dirs   one glob per line, '#' comments. A file
+#                         rather than an exported variable because a tmux key
+#                         binding runs under the tmux *server's* environment,
+#                         which never saw your .zshrc.
+#   built-in defaults     so most machines need no configuration at all
+roots() {
+    if [[ -n "${ENVUP_PROJECT_DIRS:-}" ]]; then
+        printf '%s\n' "${ENVUP_PROJECT_DIRS//:/$'\n'}"
+    elif [[ -r "$CONF" ]]; then
+        sed -e 's/#.*//' -e 's/[[:space:]]*$//' -e '/^$/d' "$CONF"
+    else
+        printf '%s\n' \
+            "$HOME/work/*" "$HOME/src/*" "$HOME/projects/*" \
+            "$HOME/dev/*"  "$HOME/repos/*" "$HOME/go/src/*/*"
+    fi
+}
+
+candidates() {
+    local pat d
+    while IFS= read -r pat; do
+        [[ -n "$pat" ]] || continue
+        pat="${pat/#\~/$HOME}"
+        # Unquoted on purpose — the whole point of an entry is that it globs.
+        # shellcheck disable=SC2086
+        for d in $pat; do [[ -d "$d" ]] && printf '%s\n' "$d"; done
+    done < <(roots) | awk '!seen[$0]++'
+}
+
+command -v tmux >/dev/null 2>&1 || die "tmux is not installed here"
+
+if (( $# > 0 )); then
+    selected="$1"
+    [[ -d "$selected" ]] || die "not a directory: $selected"
+else
+    list="$(candidates)"
+    if [[ -z "$list" ]]; then
+        die "no project directories found. List yours, one glob per line, in $CONF"
+    fi
+    command -v fzf >/dev/null 2>&1 || die "fzf is not installed here (envup install fzf)"
+    selected="$(printf '%s\n' "$list" | fzf --prompt='project> ' --height=100% --reverse)"
+    [[ -n "$selected" ]] || exit 0      # picker cancelled — not an error
+fi
+
+selected="${selected%/}"
+# tmux treats '.' and ':' as address separators in a session name.
+name="$(basename "$selected" | tr '.:' '__')"
+
+# '=' is tmux's exact-match prefix: without it `has-session -t api` also matches
+# a session called 'api-gateway', and you would be sent to the wrong project.
+tmux has-session -t "=$name" 2>/dev/null ||
+    tmux new-session -d -s "$name" -c "$selected" ||
+    die "could not create session '$name'"
+
+if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "=$name"
+else
+    tmux attach-session -t "=$name"
+fi

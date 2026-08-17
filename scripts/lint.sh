@@ -8,7 +8,8 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 2
 
 shopt -s nullglob
-files=(envup lib.sh lib/*.sh modules/*/*.sh profiles/*.sh scripts/*.sh tests/integration/*.sh)
+files=(envup lib.sh lib/*.sh modules/*/*.sh modules/*/files/bin/*
+       profiles/*.sh scripts/*.sh tests/integration/*.sh)
 
 rc=0
 

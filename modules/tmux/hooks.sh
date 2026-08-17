@@ -14,7 +14,8 @@ pre_install() {
 
 post_install() {
     log_hint "reload: tmux source ~/.tmux.conf (or restart the server)"
-    log_hint "save/restore a session by hand: prefix Ctrl-s / prefix Ctrl-r"
-    log_hint "per-machine overrides go in ~/.tmux.local (gitignored)"
+    log_hint "jump to a project: prefix f  (or 'ts' from the shell)"
+    log_hint "copy to the clipboard of the machine you are sitting at: just yank — see docs/CLIPBOARD.md"
+    log_hint "per-machine config: modules/tmux/files/hosts/$ENVUP_HOST.conf (committed) or ~/.tmux.local (private)"
     return 0
 }
