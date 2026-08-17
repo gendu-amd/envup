@@ -69,6 +69,9 @@ require "autocmds"
 -- After options: NvChad sets clipboard=unnamedplus, and this decides where that
 -- actually goes on a machine with no clipboard tool. See configs/clipboard.lua.
 require "configs.clipboard"
+-- Writes Session.vim while you work, so a tmux pane that a reboot took down
+-- comes back with your files in it. No-op outside tmux. See configs/session.lua.
+require("configs.session").setup()
 
 vim.schedule(function()
   require "mappings"

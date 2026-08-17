@@ -15,6 +15,7 @@
 #   65-func      functions
 #   70-host      hosts/<hostname>.zsh — committed per-machine config
 #   80-local     ~/.zshrc.local — personal, never committed, wins over all
+#   90-tmux      attach to tmux, restoring what the last reboot interrupted
 #
 # The numbers replaced a hand-maintained list in this file. The list kept the
 # order readable but let it be wrong: tools loaded before platform, so on macOS

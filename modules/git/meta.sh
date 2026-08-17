@@ -27,5 +27,9 @@ LINKS=("modules/git/files/.gitconfig:$HOME/.gitconfig")
 # `envup install git` to pick it up.
 LINKS+=("?modules/git/files/hosts/${ENVUP_HOST}.gitconfig:$HOME/.gitconfig.host")
 
+# The global ignore list. git looks here by itself — no core.excludesFile, no
+# [include] — so it is a file rather than another section of .gitconfig.
+LINKS+=("modules/git/files/ignore:$HOME/.config/git/ignore")
+
 # Config is the user's source of truth, never cache.
 CLEAN_PATHS=()

@@ -1,0 +1,18 @@
+# Global gitignore (managed by envup — symlinked to ~/.config/git/ignore)
+#
+# git reads this path on its own, with no core.excludesFile setting and no
+# [include] — which is why it is a plain file here rather than another section
+# in .gitconfig.
+#
+# Keep it to files *your tools* leave in other people's repositories. Anything
+# specific to a project belongs in that project's .gitignore, where the rest of
+# the team can see it.
+
+# Written by nvim while you work, so that a tmux pane killed by a reboot comes
+# back with your files open. A clean quit removes it; a crash does not, and the
+# leftover should not turn up in `git status`.
+# See modules/nvim/files/lua/configs/session.lua.
+Session.vim
+
+# nvim's log, if something asks it to write one in the current directory.
+.nvimlog
