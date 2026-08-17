@@ -9,11 +9,14 @@ lib.sh                 # thin loader: sources lib/*.sh in dependency order
 lib/
   log.sh               # logging + log levels
   caps.sh              # capability detection: OS/distro/arch/libc/privilege/network
-  fs.sh                # _realpath, safe_link, unlink_safe, block_set/del
+  fs.sh                # _realpath, safe_link, unlink_safe, block_set/del,
+                       # and the two reclaim paths: empty dirs, files envup made
   net.sh               # gh_url, net_run, net_fetch, net_clone, offline handling
   pkg.sh               # package-manager abstraction + cross-distro package names
   manifest.sh          # the manifest (schema 2: state/provider/version/time + repo root)
   module.sh            # meta reading, dependency resolution, profiles
+  verify.sh            # is a tool present, runnable and new enough — asked by
+                       # engine, health, doctor and hooks, so it installs nothing
   engine.sh            # the install engine: providers → links → hooks → verify
   providers/
     system.sh          # apt/dnf/yum/pacman/brew/apk
@@ -118,6 +121,14 @@ the choke point stays a choke point.
   Ownership is decided by comparing paths **both resolved and unresolved** — on a
   home directory automounted as `/home` → `/mnt/home`, a resolved-only comparison
   makes envup refuse to remove its own links.
+  Not everything envup creates is a symlink, so two narrower reclaims sit beside
+  it: `dir_prune_empty` gives back a directory that was only ever made to hold a
+  link (`~/.config/git`, `~/.tmux/plugins`, an unused `~/.local/bin`), using
+  `rmdir` so a non-empty one is impossible to take; and `created_note` /
+  `created_reclaim` let `block_del` delete a `~/.bashrc` that envup itself had to
+  create — recorded at creation time in `$ENVUP_STATE_DIR/created`, and only
+  while it is still empty, because "delete any empty file" would break the same
+  guarantee from the other side.
 - **`_realpath`** falls back `readlink -f` → python3 → `cd -P && pwd -P`, so it is
   correct on a macOS without coreutils.
 - **No step can wedge the whole run.** `net_run` wraps git/curl, `pkg_install` wraps

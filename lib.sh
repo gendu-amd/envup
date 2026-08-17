@@ -14,6 +14,7 @@
 #   pkg       package managers                              (log, caps, net)
 #   manifest  which modules are installed on this machine   (log)
 #   module    meta / deps / profiles / hook runner          (log, caps, net)
+#   verify    is a tool present, runnable and new enough    (log)
 #   engine    the declarative install driver                (all of the above)
 #   providers one route each to getting a tool installed    (engine)
 #   health    what is actually true on this machine now     (fs, manifest, engine)
@@ -49,6 +50,8 @@ source "$_ENVUP_LIB/pkg.sh"
 source "$_ENVUP_LIB/manifest.sh"
 # shellcheck source=lib/module.sh
 source "$_ENVUP_LIB/module.sh"
+# shellcheck source=lib/verify.sh
+source "$_ENVUP_LIB/verify.sh"
 # shellcheck source=lib/engine.sh
 source "$_ENVUP_LIB/engine.sh"
 

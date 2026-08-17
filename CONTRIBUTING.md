@@ -93,7 +93,9 @@ Every `lib/` helper is available. Use them instead of raw commands:
 | `bin_path <cmd>` / `bin_version <cmd>` | resolve a binary (including `~/.local/bin`) / read its version |
 | `safe_link <src> <dst>` | symlink `<src>` → `<dst>`, backing up any existing real file. `<src>` is relative to the repo root. |
 | `safe_link_optional <src> <dst>` | same, but skip silently if `<src>` is missing |
-| `unlink_safe <dst>` | remove a symlink **only if** it points into the repo |
+| `unlink_safe <dst>` | remove a symlink **only if** it points into the repo, and give back the directory chain it lived in if that is now empty |
+| `dir_prune_empty <dir>` | `rmdir` `<dir>` and each parent that empties with it, stopping at `$HOME`. For a directory your hook created and no longer needs |
+| `created_note <file>` / `created_reclaim <file>` | record that envup created a file it does not own, and later delete it — but only if it is still empty. `block_set`/`block_del` do this for you |
 | `net_run "<desc>" -- <cmd>...` | run a network command with a timeout |
 | `net_fetch <url> [dst]` / `net_clone <url> <dst>` | download / clone through the mirror, proxy, offline check and timeout |
 | `gh_url <url>` | rewrite a GitHub URL through `ENVUP_GH_MIRROR` |
@@ -171,7 +173,10 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
 - **Unit tests** (`tests/unit/`) cover the library, one file per concern:
   `caps` (privilege/network/arch detection), `engine` + `providers` (the install
   contract), `realpath` / `link` / `unlink` (path ownership, including
-  symlinked-home cases), `manifest`, `health`, `doctor`, `adopt`, and
+  symlinked-home cases), `reclaim` (the parts of an uninstall that are not
+  symlinks — empty directories, and the `~/.bashrc` envup had to create),
+  `liblayout` (that the loader and the lint size budget both still cover every
+  file in `lib/`), `manifest`, `health`, `doctor`, `adopt`, and
   `zshconfig` (which starts real interactive zsh shells to assert slice order,
   PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
   change these. Several cover shipped config rather than library code:

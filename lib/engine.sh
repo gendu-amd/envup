@@ -26,7 +26,11 @@
 #   skipped    the module does not apply to this machine
 #   failed     something that should have worked didn't
 #
-# Depends on: log.sh, caps.sh, fs.sh, net.sh, pkg.sh, module.sh
+# "Is the tool there and good enough?" is asked here at three points, but the
+# answer is not computed here — lib/verify.sh owns it, because `status` and
+# `doctor` ask the same question without installing anything.
+#
+# Depends on: log.sh, caps.sh, fs.sh, net.sh, pkg.sh, module.sh, verify.sh
 # ============================================
 
 # Result codes. These travel out through the watchdog child's exit status, so
@@ -37,9 +41,6 @@ ENVUP_RC_SKIPPED=71
 # machine at all (no package for this distro, no release asset for this arch).
 # Distinct from a real failure: it isn't worth a warning, just move on.
 ENVUP_RC_UNAVAIL=79
-
-# Where user-space installs go. Everything root-free lands here.
-ENVUP_LOCAL_BIN="${ENVUP_LOCAL_BIN:-$HOME/.local/bin}"
 
 # ---- module metadata -----------------------------------------------------
 # _engine_load <mod> — source meta.sh (+ optional hooks.sh) and give every
@@ -82,70 +83,6 @@ pkg_name() {
         [[ "${entry%%:*}" == "$fam" ]] && { printf '%s' "${entry#*:}"; return 0; }
     done
     printf '%s' "${PKG_DEFAULT:-$NAME}"
-}
-
-# ---- verification --------------------------------------------------------
-# bin_path <name> — where this binary actually is, including the user-space dir
-# that may not be on PATH yet in this process (we just created it).
-bin_path() {
-    local b="$1" p
-    p="$(command -v "$b" 2>/dev/null)" && { printf '%s' "$p"; return 0; }
-    [[ -x "$ENVUP_LOCAL_BIN/$b" ]] && { printf '%s' "$ENVUP_LOCAL_BIN/$b"; return 0; }
-    return 1
-}
-
-# bin_runs <name> — does this binary actually execute on this machine? Being on
-# PATH and +x is not the same thing: a prebuilt binary linked against a newer
-# glibc than the host has gets installed happily and then dies on every call
-# with "version `GLIBC_2.33' not found". Asking it for its version is the
-# cheapest way to make it prove itself.
-bin_runs() {
-    local p; p="$(bin_path "$1")" || return 1
-    # Unquoted on purpose: a module may need more than one word ("version -q").
-    # shellcheck disable=SC2086
-    "$p" ${VERIFY_VERSION_ARG:---version} >/dev/null 2>&1
-}
-
-# bin_version <name> — first dotted number the tool prints. Deliberately loose
-# about the format (every tool differs and we only ever compare it), strict
-# about two things:
-#
-#   - a non-zero exit means no answer. Scraping the failure message above gave
-#     nvim a confident "2.33" and a green tick for a binary that cannot start.
-#   - stdout first. stderr is read only after a clean exit, for the few tools
-#     that print their banner there, so a warning can never become a version.
-bin_version() {
-    local p; p="$(bin_path "$1")" || return 1
-    local v out
-    # shellcheck disable=SC2086
-    out="$("$p" ${VERIFY_VERSION_ARG:---version} 2>/dev/null)" || return 1
-    v="$(printf '%s\n' "$out" | head -3 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
-    # shellcheck disable=SC2086
-    [[ -n "$v" ]] || v="$("$p" ${VERIFY_VERSION_ARG:---version} 2>&1 >/dev/null |
-        head -3 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
-    [[ -n "$v" ]] || return 1
-    printf '%s' "$v"
-}
-
-# version_ge <have> <want> — true when <have> is at least <want>.
-version_ge() {
-    [[ "$1" == "$2" ]] && return 0
-    [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$2" ]]
-}
-
-# engine_verify — is the tool present and good enough? A module may replace this
-# wholesale by defining verify() in hooks.sh.
-engine_verify() {
-    declare -F verify >/dev/null && { verify; return $?; }
-    [[ -n "$VERIFY_BIN" ]] || return 0
-    bin_path "$VERIFY_BIN" >/dev/null || return 1
-    # Present is not the same as working. A module whose tool has no --version
-    # (or answers on a flag envup cannot guess) sets VERIFY_VERSION_ARG, or
-    # replaces this check wholesale with verify() in hooks.sh.
-    bin_runs "$VERIFY_BIN" || return 1
-    [[ -n "$VERIFY_MIN_VERSION" ]] || return 0
-    local v; v="$(bin_version "$VERIFY_BIN")" || return 1
-    version_ge "$v" "$VERIFY_MIN_VERSION"
 }
 
 # ---- providers -----------------------------------------------------------
@@ -348,6 +285,11 @@ engine_uninstall() {
     # Binaries are never removed: envup did not necessarily install them, and
     # on a shared machine it certainly isn't envup's call.
     [[ -n "$VERIFY_BIN" ]] && log_info "[$mod] $VERIFY_BIN left installed (envup only removes its own symlinks)"
+    # Which is exactly why this is safe: if anything was installed user-space
+    # the directory is not empty and rmdir declines. An empty one is envup's
+    # own leftover — the github_release provider creates it before it knows
+    # whether it will have anything to put there.
+    dir_prune_empty "$ENVUP_LOCAL_BIN"
     return 0
 }
 

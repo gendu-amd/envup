@@ -217,6 +217,43 @@ changes — every addition is inert until you create the file that uses it.
   stock macOS, `shasum` from slim Linux images. A machine with none of the three
   reports that it cannot check rather than passing the file.
 
+### An uninstall that actually gets back to where it started
+
+- **`uninstall --all` no longer leaves an empty `~/.bashrc` behind.** On a home
+  that had no `~/.bashrc`, the zsh module has to create one before it can write
+  the `exec zsh` shim into it. Removing the shim left the file at 0 bytes —
+  reversible with an asterisk on it. `block_set` now records the files it
+  brought into existence (in `$ENVUP_STATE_DIR/created`, beside the manifest,
+  because that is a fact about the machine and not about the repo two machines
+  share) and `block_del` reclaims one only if envup created it *and* it is empty
+  again. A `~/.bashrc` you already had, or that you have since written to, is
+  left exactly as it is — "delete any empty file" would have broken the same
+  guarantee from the other side.
+- **Directories that only existed to hold a symlink are given back.** A real
+  install created `~/.config/git`, `~/.tmux/plugins` and `~/.local/bin`; an
+  uninstall removed the links inside them and left three empty directories.
+  `unlink_safe` now prunes the chain it linked into, and `engine_uninstall`
+  does the same for `~/.local/bin`. The mechanism is `rmdir`, which refuses a
+  directory with anything at all in it — so a `~/.local/bin` holding a binary
+  envup installed, or a `~/.config/git` holding a file you wrote, is untouched.
+- Still deliberately kept: system packages, binaries in `~/.local/bin`, the
+  `chsh` setting, `~/.gitconfig.local`, `~/.oh-my-zsh`, and everything under
+  `~/.dotfiles_backup/`.
+
+### Internals
+
+- **`lib/verify.sh`** — "is this tool present, runnable and new enough?" moved
+  out of `engine.sh`, which was over the size budget. The seam is not just
+  arithmetic: `status`, `doctor` and module hooks all ask that question without
+  installing anything, and keeping it in the install engine made that easy to
+  forget.
+- **`scripts/lint.sh` now measures `lib/providers/*.sh` too.** They had been
+  excused from the size budget as "one route each", and `github_release.sh`
+  grew to within five lines of the threshold with nobody being told. A guard
+  that skips files is worse than no guard, because it reads like coverage —
+  `tests/unit/liblayout.bats` now asserts that every file in `lib/` appears in
+  lint's output and that `lib.sh` sources each one by name.
+
 ### Fixed
 
 - **`.gitconfig` no longer names binaries it cannot guarantee.** `core.editor =

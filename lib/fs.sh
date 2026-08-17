@@ -12,7 +12,11 @@
 # by more than one path. That is what _realpath and paths_same are for, and why
 # they are the first thing in this file.
 #
-# Depends on: log.sh
+# I3 is also why the last two sections exist: a directory or a file that only
+# exists because envup made one has to go back too, and neither is a symlink.
+#
+# Depends on: log.sh (and $ENVUP_STATE_DIR, defaulted here so the file still
+# stands alone; lib/manifest.sh is the one that really owns it)
 # ============================================
 
 # ---- path resolution -----------------------------------------------------
@@ -150,7 +154,76 @@ unlink_safe() {
     local dst="$1"
     is_envup_link "$dst" || { log_info "skip (not an envup link): $dst"; return 0; }
     if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then log_info "[dry-run] rm $dst"; return 0; fi
-    rm -f "$dst" && log_success "unlinked: $dst"
+    rm -f "$dst" || return 1
+    log_success "unlinked: $dst"
+    # _link created the directory chain on the way in; take back whatever of it
+    # is empty on the way out. ~/.config/git and ~/.tmux/plugins exist for no
+    # reason other than that envup put a link in them.
+    dir_prune_empty "${dst%/*}"
+}
+
+# dir_prune_empty <dir> — remove <dir> and each parent that is empty once the
+# child is gone, stopping at $HOME. rmdir is the entire safety argument: it
+# refuses a directory with anything at all in it, so this cannot take a file
+# with it no matter what it is pointed at. The $HOME bound is belt and braces.
+dir_prune_empty() {
+    local dir="${1:-}" home="${HOME%/}" guard=0
+    [[ -n "$dir" && -n "$home" ]] || return 0
+    if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then
+        # Nothing was removed, so there is no way to know which parents would
+        # have become empty. Report the leaf and stop guessing.
+        [[ -d "$dir" && "$dir" == "$home"/* ]] && log_info "[dry-run] rmdir (if empty) $dir"
+        return 0
+    fi
+    while [[ -d "$dir" && "$dir" == "$home"/* ]]; do
+        (( ++guard > 32 )) && break            # a path this deep is a bug, not a home
+        rmdir "$dir" 2>/dev/null || return 0   # not empty: done, and not an error
+        log_info "removed empty directory: $dir"
+        dir="${dir%/*}"
+    done
+    return 0
+}
+
+# ---- files envup brought into existence -----------------------------------
+# block_set writes into files it does not own, and on a home that has no
+# ~/.bashrc at all it has to create one first. Deleting the block later then
+# leaves a 0-byte file behind, which makes the uninstall one file short of I3.
+#
+# Deleting whatever happens to be empty would break I3 from the other side, by
+# removing a file the user made. So creation is recorded, and only a recorded
+# file is reclaimed, and only while it is still empty. The ledger sits beside
+# the manifest for the same reason the manifest does: what exists here is a
+# fact about this machine, not about the repo two machines share.
+_created_ledger() { printf '%s/created' "${ENVUP_STATE_DIR:-$HOME/.local/state/envup}"; }
+
+created_note() {
+    local f="$1" ledger; ledger="$(_created_ledger)"
+    [[ "${ENVUP_DRY_RUN:-0}" == 1 ]] && return 0
+    grep -qxF "$f" "$ledger" 2>/dev/null && return 0
+    mkdir -p "${ledger%/*}" && printf '%s\n' "$f" >>"$ledger"
+}
+
+# created_reclaim <file> — delete <file> if envup created it and it is empty
+# again, and forget it either way. Silent when it isn't ours: this runs on
+# every uninstall, and "the user has since put something in it" is a normal
+# answer, not a problem to report.
+created_reclaim() {
+    local f="$1" ledger; ledger="$(_created_ledger)"
+    [[ -f "$ledger" ]] || return 0
+    grep -qxF "$f" "$ledger" 2>/dev/null || return 0
+    if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then
+        [[ -f "$f" && ! -s "$f" ]] && log_info "[dry-run] rm (empty, created by envup) $f"
+        return 0
+    fi
+    # -L first: touch through a symlink writes to the target, so a symlinked
+    # rc file was never ours to delete.
+    if [[ ! -L "$f" && -f "$f" && ! -s "$f" ]]; then
+        rm -f "$f" && log_success "removed the empty $f envup created"
+    fi
+    { grep -vxF "$f" "$ledger" || true; } >"$ledger.tmp" && mv -f "$ledger.tmp" "$ledger"
+    # An empty ledger is one more 0-byte file nobody asked for, which is the
+    # whole complaint this function exists to answer.
+    [[ -s "$ledger" ]] || rm -f "$ledger"
 }
 
 # ---- managed text block (for files we append to but don't own, e.g. ~/.bashrc)
@@ -162,7 +235,10 @@ block_set() {
     local file="$1" tag="$2" content; content="$(cat)"
     _block_markers "$tag"
     if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then log_info "[dry-run] update '$tag' block in $file"; return 0; fi
-    mkdir -p "$(dirname "$file")"; touch "$file"
+    mkdir -p "$(dirname "$file")"
+    # Note the creation before writing: block_del is what reverses this, and it
+    # has no way to tell "envup made this file" from "it was already here".
+    [[ -e "$file" ]] || { touch "$file" && created_note "$file"; }
     block_del "$file" "$tag"
     printf '%s\n%s\n%s\n' "$_BLK_BEGIN" "$content" "$_BLK_END" >>"$file"
 }
@@ -172,4 +248,7 @@ block_del() {
     if [[ "${ENVUP_DRY_RUN:-0}" == 1 ]]; then log_info "[dry-run] remove '$tag' block from $file"; return 0; fi
     grep -qF "$_BLK_BEGIN" "$file" || return 0
     sed -i.envup-bak "\|^${_BLK_BEGIN}\$|,\|^${_BLK_END}\$|d" "$file" && rm -f "$file.envup-bak"
+    # The block may have been the only thing in there. Reached only through the
+    # grep above, so the touch inside block_set can never trip over this.
+    created_reclaim "$file"
 }

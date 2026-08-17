@@ -329,7 +329,9 @@ The `zsh` module makes zsh the shell you actually land in, on three fronts:
    regardless of the system login shell.
 
 `envup uninstall zsh` removes the `~/.bashrc` block (it leaves the `chsh`
-setting alone).
+setting alone). If envup created `~/.bashrc` in the first place — a home that
+never had one — and the block was the only thing in it, the file goes too. A
+`~/.bashrc` that was already there, or that you have since written to, stays.
 
 ### nvim module
 
@@ -405,7 +407,7 @@ used, all of them adjustable:
 Key properties:
 
 - **Idempotent**: Re-running `./envup install` is safe. Existing symlinks are detected and skipped.
-- **Reversible**: Every overwritten file is backed up to `~/.dotfiles_backup/<timestamp>/`. `./envup uninstall` removes only envup-managed symlinks.
+- **Reversible**: Every overwritten file is backed up to `~/.dotfiles_backup/<timestamp>/`. `./envup uninstall` removes only envup-managed symlinks — plus the two things it created that aren't symlinks: a directory that exists only to hold one (removed only while empty), and a `~/.bashrc` that envup itself had to create for the zsh shim (removed only if envup created it *and* it is empty again). Your files, your packages and your `~/.gitconfig.local` are never touched.
 - **Loggable**: Every command writes a timestamped log under `~/.local/state/envup/logs/`. Use `./envup log --tail` to follow live.
 - **Cross-platform**: macOS, Linux (apt/dnf/yum/pacman/brew/apk), WSL2, Docker. Auto-detects the platform and package manager.
 - **Degradable**: what can't be installed here is reported, not fatal — and the config lands either way.

@@ -240,7 +240,7 @@ $ envup adopt
 
 - **备份而非覆盖**：`safe_link` 会先把目标处的真实文件移到 `~/.dotfiles_backup/<时间戳>/`。
 - **幂等**：重复安装对已正确的软链是 no-op。
-- **可逆**：`unlink_safe`（即 `envup uninstall`）只删指向仓库内部的软链，绝不动你自己的文件。
+- **可逆**：`unlink_safe`（即 `envup uninstall`）只删指向仓库内部的软链，绝不动你自己的文件。另外两样不是软链、但确实是 envup 造出来的东西也会一并收回：只为放一个软链而建的目录（仅在空目录时 `rmdir`），以及为了写 zsh shim 而不得不新建的 `~/.bashrc`（仅当"是 envup 建的"且"现在又空了"时才删）。你原本就有的 `~/.bashrc`、你后来往里写的内容、系统包、`~/.gitconfig.local` 都不动。
 - **跨平台**：自动识别平台、包管理器、架构、libc、权限、网络。
 - **卡不死**：网络与包管理器有超时，模块钩子有看门狗。
 - **dry-run 是彻底的**：`ENVUP_DRY_RUN=1` / `--dry-run` 预览所有改动，provider 内部也一样。
