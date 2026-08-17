@@ -199,26 +199,15 @@ EOF
     esac; done
     log_init upgrade
 
+    # upgrade_source reports its own reason — see lib/upgrade.sh, which knows
+    # the failures this repo's design actually produces (a config edited
+    # through its symlink, a HEAD left detached by an earlier --ref).
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
     local ok=1
-    if [[ $dry == 1 ]]; then
-        if [[ -n "$ref" ]]; then log_info "[dry-run] would: git fetch --tags && git checkout $ref (+submodules)"
-        else log_info "[dry-run] would: git pull --recurse-submodules"; fi
-    elif [[ -n "$ref" ]]; then
-        if ! ( cd "$ENVUP_HOME" \
-                && net_run "git fetch" -- git fetch --tags --recurse-submodules \
-                && git checkout "$ref" \
-                && git submodule update --init --recursive ); then
-            ok=0
-            log_error "checkout of '$ref' failed — source NOT updated"
-            log_hint "check: cd $ENVUP_HOME && git status; git tag"
-            [[ $keep == 1 ]] || { log_hint "use --keep-going to reinstall with the current source"; return 1; }
-        fi
-    elif ! ( cd "$ENVUP_HOME" && net_run "git pull" -- git pull --recurse-submodules ); then
+    upgrade_source "$ref" || {
         ok=0
-        log_error "git pull failed — source NOT updated"
-        log_hint "check: cd $ENVUP_HOME && git status"
         [[ $keep == 1 ]] || { log_hint "use --keep-going to reinstall with the current source"; return 1; }
-    fi
+    }
 
     local -a inst=(); mapfile -t inst < <(manifest_list)
     if (( ${#inst[@]} == 0 && ${#fwd[@]} == 0 )); then
@@ -227,7 +216,7 @@ EOF
     [[ $dry == 1 ]] && fwd+=(--dry-run)
 
     cmd_install "${fwd[@]}" "${inst[@]}"; local rc=$?
-    if (( ok == 0 )); then echo; log_error "REMINDER: git pull failed earlier — reinstalled OLD source"; return 1; fi
+    if (( ok == 0 )); then echo; log_error "REMINDER: the source was NOT updated — this reinstalled the OLD source"; return 1; fi
     return $rc
 }
 

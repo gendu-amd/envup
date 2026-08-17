@@ -26,6 +26,7 @@ lib/
     manual.sh          # print instructions, mark the module degraded
   health.sh            # read-only inspection: what is actually true on disk
   adopt.sh             # move third-party appends out of the tracked repo
+  upgrade.sh           # move the checkout forward, and say why it wouldn't
   authoring.sh         # static validation of module conventions
   doctor.sh            # the machine health check
 modules/<name>/

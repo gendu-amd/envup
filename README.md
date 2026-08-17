@@ -128,6 +128,7 @@ A few important semantics that aren't obvious from the one-liners:
 - `doctor --authoring` is the other half: static validation of the modules in the repo (meta fields, function-wrapped hooks, valid `DEPENDS`, no hand-rolled downloads, `CLEAN_PATHS` that never targets user data). Run it after adding a module.
 - `adopt` handles the case where a third-party installer appended itself to one of your tracked config files. It moves those lines to `~/.zshrc.local` and restores the repo file. See [Configuration Sync](#configuration-sync).
 - **No step can hang the whole run:** network calls and the package manager are wrapped in timeouts, and each module hook runs under an outer watchdog (`ENVUP_MODULE_TIMEOUT`, default 900s). A stuck module is killed and reported failed; install continues with the rest. (Needs a `timeout`/`gtimeout` binary — on macOS: `brew install coreutils`.)
+- **When `upgrade` can't move the source, it says which of envup's own failure modes it hit** — a managed config edited through its symlink (named file by file, with `envup adopt`), other uncommitted changes (with `git stash`), a HEAD left detached by an earlier `--ref` (caught before the fetch, with the way back), a branch with no upstream, or a directory that isn't a git checkout. Plugin submodules sitting at a newer commit are expected state and are not reported as dirt.
 - `upgrade --keep-going` lets the run continue even if `git pull` failed; otherwise upgrade aborts to avoid silently reinstalling stale config.
 - `upgrade --dry-run` skips `git pull` entirely and forwards `--dry-run` to install.
 - `clean` removes module-managed plugin caches (lazy.nvim, mason, oh-my-zsh, etc.) — NOT the binary, NOT your config. Useful when nvim Lazy state gets weird.
@@ -493,8 +494,15 @@ git submodule update --init --recursive   # or: ./envup doctor --fix
 
 **Everything broke after moving the repo** — every symlink points at the old path. envup records where links were made from, so this is one message rather than twenty: `envup doctor --fix` relinks from the new location.
 
-**`envup upgrade` fails its `git pull` with local changes** — something appended to a
-tracked config file. See [Configuration Sync](#configuration-sync) and `envup adopt`.
+**`envup upgrade` won't update the source** — it now tells you which of these it
+is instead of leaving you with git's message alone. A tracked config file was
+edited in place (something appended through the `~/.zshrc` symlink) → the files
+are listed and `envup adopt` moves the additions out; see
+[Configuration Sync](#configuration-sync). Other uncommitted changes → listed,
+with `git stash`. HEAD detached, which is what an earlier `upgrade --ref v0.2.0`
+leaves behind → caught before the fetch, with `envup upgrade --ref main` as the
+way back. A branch with no upstream, or a checkout that isn't a git repo at all
+→ named as such.
 
 **`nvim too old` error** — NvChad needs nvim >= 0.10 and envup does NOT touch your APT sources. Upgrade via `brew install neovim`, `conda install -c conda-forge neovim` (best on old-glibc systems like RHEL/CentOS 8), or a source build, then re-run `envup install nvim`.
 

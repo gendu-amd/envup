@@ -176,7 +176,9 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   symlinked-home cases), `reclaim` (the parts of an uninstall that are not
   symlinks — empty directories, and the `~/.bashrc` envup had to create),
   `liblayout` (that the loader and the lint size budget both still cover every
-  file in `lib/`), `manifest`, `health`, `doctor`, `adopt`, and
+  file in `lib/`), `manifest`, `health`, `doctor`, `adopt`, `upgrade` (which
+  builds a real local origin and clone rather than stubbing git, because
+  telling a dirty tree from a detached HEAD is the whole point), and
   `zshconfig` (which starts real interactive zsh shells to assert slice order,
   PATH dedup and the conditional locale/EDITOR behaviour). Add a case when you
   change these. Several cover shipped config rather than library code:

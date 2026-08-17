@@ -74,6 +74,9 @@ exec zsh
 - `doctor` 体检**这台机器**：软链、工具版本、manifest、子模块、`~/.local/bin` 是否在 PATH、locale 是否有效、仓库是否被移动或被污染。`--fix` 修完会**再查一遍**，所以干净退出的含义是"已修好"，而不是"我试过了"。
 - `doctor --authoring` 是另一半：静态校验仓库里的模块写法（元数据字段、钩子是否 function 包裹、`DEPENDS` 是否存在、有没有裸下载、`CLEAN_PATHS` 是否误含用户数据）。新增模块后跑一下。
 - `adopt` 处理"第三方安装脚本往你的托管配置里追加了几行"这种情况，见下文[配置同步](#配置同步)。
+- **`upgrade` 更新不动源码时，会说清楚是撞上了 envup 自己的哪种失败**：托管配置被人顺着软链改了（逐个文件列出，给 `envup adopt`）、其它未提交改动（给 `git stash`）、之前 `--ref` 留下的游离 HEAD（在联网之前就拦下，并给出回去的命令）、分支没有 upstream、或者这压根不是一个 git 检出。插件子模块停在更新的 commit 上属于正常状态，不会被当成脏。
+- `upgrade --keep-going` 即使更新失败也继续重装；默认则中止，免得悄悄拿旧源码重装一遍。
+- `upgrade --dry-run` 完全不碰检出，只预览。
 - **任何一步都卡不死整轮**：网络调用和包管理器都有超时，每个模块钩子还套了一层看门狗（`ENVUP_MODULE_TIMEOUT`，默认 900s）。
 - `ENVUP_LOG_LEVEL=debug|info|warn|error`（默认 `info`）控制终端输出详略；日志文件始终记录全量。
 
@@ -221,7 +224,7 @@ git 在这两层之下还有一层 `~/.gitconfig.envup`：每次安装按这台�
 
 ### 万一还是有东西写进了仓库
 
-因为 `~/.zshrc` 是指向仓库的软链，某个"贴心"的第三方安装脚本往它尾部追加，就是在改一个被跟踪的文件 —— 下一台机器上 `envup upgrade` 的 `git pull` 就会失败。
+因为 `~/.zshrc` 是指向仓库的软链，某个"贴心"的第三方安装脚本往它尾部追加，就是在改一个被跟踪的文件 —— 下一台机器上 `envup upgrade` 的 `git pull` 就会失败。（失败时 envup 会直接点名是哪几个文件、并提示 `envup adopt`，不会只丢一句 git 的原话给你。）
 
 `envup doctor` 会发现，`envup adopt` 负责还原：
 

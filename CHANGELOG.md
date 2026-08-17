@@ -240,8 +240,37 @@ changes — every addition is inert until you create the file that uses it.
   `chsh` setting, `~/.gitconfig.local`, `~/.oh-my-zsh`, and everything under
   `~/.dotfiles_backup/`.
 
+### `envup upgrade` says why it couldn't update the source
+
+- **The failure that this design produces most often is now diagnosed by name.**
+  Configs are symlinks *into* the checkout, so the working tree is in daily use
+  and a tool that appends to `~/.zshrc` is appending to a tracked file. Every
+  such case used to print one line — "git pull failed — source NOT updated" —
+  which is true, identical for a dozen different causes, and hands you back to
+  bare git. `envup upgrade` now names the managed files that were edited in
+  place and points at `envup adopt`, lists other uncommitted changes separately
+  with `git stash`, and reports a branch with no upstream or a directory that
+  is not a git checkout as themselves.
+- **A detached HEAD is caught before the network call.** `envup upgrade --ref
+  v0.2.0` leaves HEAD detached by design, and every plain `envup upgrade` after
+  it fails forever. That one is certain rather than likely, so it is checked
+  locally — with `envup upgrade --ref main` given as the way back — instead of
+  spending the fetch timeout to find out.
+- **Plugin submodules at a newer commit are not dirt.** They move whenever a
+  plugin updates; counting that as pollution would make every machine with
+  up-to-date plugins unupgradable.
+- The diagnosis runs *after* git has spoken, not instead of it: a dirty tree
+  only fails a pull that would have to overwrite the dirty file, so pre-refusing
+  would block upgrades that were going to work.
+- `tests/unit/upgrade.bats` — 17 cases against a real local origin and clone.
+  Nothing about git is stubbed, because telling a dirty tree from a detached
+  HEAD from a missing upstream is the entire thing being tested. Previously two
+  files mentioned the command at all.
+
 ### Internals
 
+- **`lib/upgrade.sh`** — the `git` half of `cmd_upgrade`, which had been two
+  lines of error handling inside the CLI.
 - **`lib/verify.sh`** — "is this tool present, runnable and new enough?" moved
   out of `engine.sh`, which was over the size budget. The seam is not just
   arithmetic: `status`, `doctor` and module hooks all ask that question without

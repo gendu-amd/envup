@@ -19,6 +19,8 @@
 #   providers one route each to getting a tool installed    (engine)
 #   health    what is actually true on this machine now     (fs, manifest, engine)
 #   adopt     rescuing third-party edits out of the repo    (health)
+#   upgrade   moving the checkout forward, and saying why    (net, health)
+#             it wouldn't
 #   authoring static checks of the module contract          (module)
 #   doctor    diagnose + repair, on top of all three        (health, adopt, authoring)
 #
@@ -70,6 +72,8 @@ unset _p
 source "$_ENVUP_LIB/health.sh"
 # shellcheck source=lib/adopt.sh
 source "$_ENVUP_LIB/adopt.sh"
+# shellcheck source=lib/upgrade.sh
+source "$_ENVUP_LIB/upgrade.sh"
 # shellcheck source=lib/authoring.sh
 source "$_ENVUP_LIB/authoring.sh"
 # shellcheck source=lib/doctor.sh
