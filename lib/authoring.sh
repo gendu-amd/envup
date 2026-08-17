@@ -63,13 +63,19 @@ authoring_module() {
         esac
     done < <(module_meta "$m" PROVIDERS)
 
+    local opt
     while IFS= read -r e; do
         [[ -n "$e" ]] || continue
-        e="${e#\?}"; src="${e%%:*}"
+        opt=0; [[ "$e" == '?'* ]] && { opt=1; e="${e#\?}"; }
+        src="${e%%:*}"
         if [[ "$src" == "$e" ]]; then
             log_error "[$m] malformed LINKS entry (want 'src:dst'): $e"; n=$((n+1)); continue
         fi
-        [[ -e "$ENVUP_HOME/$src" ]] || { log_warn "[$m] LINKS source does not exist: $src"; }
+        # '?' means the module already said missing is fine — a hosts/<hostname>
+        # file exists on the one machine it describes and nowhere else, so
+        # warning about it would fire on every other machine, forever.
+        (( opt )) || [[ -e "$ENVUP_HOME/$src" ]] ||
+            log_warn "[$m] LINKS source does not exist: $src"
     done < <(module_meta "$m" LINKS)
 
     while IFS= read -r p; do

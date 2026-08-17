@@ -31,6 +31,17 @@ for _p in "${TMUX_PLUGINS[@]}"; do
 done
 unset _p
 
+# The committed per-machine layer, same idea as ~/.zshrc.d/hosts/. tmux cannot
+# expand $(hostname) inside source-file, so envup resolves the hostname here and
+# links this machine's file to one fixed path. '?' because most hosts have no
+# file — that is the normal case, not a fault. Create one and re-run
+# `envup install tmux` to pick it up.
+LINKS+=("?modules/tmux/files/hosts/${ENVUP_HOST}.conf:$HOME/.tmux/host.conf")
+
+# Not config: a helper the tmux binding and the shell both call. It rides with
+# tmux because it is useless without it.
+LINKS+=("modules/tmux/files/bin/tmux-sessionizer:$HOME/.local/bin/tmux-sessionizer")
+
 # Deliberately empty. resurrect/continuum saves under
 # ~/.local/share/tmux/resurrect/ are the layout you were last working in —
 # user data, not cache. Delete that directory by hand if you really mean it.

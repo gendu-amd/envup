@@ -94,7 +94,10 @@ _link() {
     local src="$1" dst="$2" mode="${3:-required}"
     [[ "$src" != /* ]] && src="$ENVUP_HOME/$src"
     if [[ ! -e "$src" ]]; then
-        [[ "$mode" == optional ]] && { log_warn "skip optional (missing): $src"; return 0; }
+        # Declared optional by the module, so absence is a fact, not a fault —
+        # info, not warn. A hosts/<hostname> file is missing on every machine
+        # except the one it is for.
+        [[ "$mode" == optional ]] && { log_info "skip optional (not present): $src"; return 0; }
         log_error "source not found: $src"; log_hint "did you 'git clone --recursive'?"; return 1
     fi
     # Already pointing where we want it. Compare the raw target first (cheap,
