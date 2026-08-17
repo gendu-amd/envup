@@ -17,14 +17,14 @@ teardown() {
     [[ "$output" == *"install order: zsh git"* ]]
 }
 
-@test "standard resolves to: zsh git tmux fzf ripgrep fd zoxide atuin delta" {
+@test "standard resolves to: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv" {
     HOME="$TEST_HOME" run "$REPO_ROOT/envup" install -p standard --dry-run
     [ "$status" -eq 0 ]
-    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd zoxide atuin delta"* ]]
+    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv"* ]]
 }
 
 @test "full resolves to: standard + nvim, with nvim last" {
     HOME="$TEST_HOME" run "$REPO_ROOT/envup" install -p full --dry-run
     [ "$status" -eq 0 ]
-    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd zoxide atuin delta nvim"* ]]
+    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv nvim"* ]]
 }

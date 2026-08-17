@@ -181,7 +181,9 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   which fails silently when wrong), `tmuxrestore` (the login hook, the
   per-machine resurrect directory, and nvim's `Session.vim`), `searchtools`
   (ripgrep / fd / delta, whose whole difficulty is that the package, the binary
-  and the module go by three different names), `checksum` (digest computation
+  and the module go by three different names), `shelltools` (eza, bat and
+  direnv — a second name on Debian, a crippled second *build* upstream, and a
+  bare binary with no archive around it), `checksum` (digest computation
   across the three tools that exist, the three checksum-file layouts upstreams
   use, and the difference between "mismatch" and "nothing to compare against"),
   and `nvimconfig` (the editor

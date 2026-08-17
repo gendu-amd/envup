@@ -167,6 +167,30 @@ changes — every addition is inert until you create the file that uses it.
   reports `openbsd-7.4`) read as old. Override with
   `tmux set-environment -g ENVUP_TS_POPUP 0` / `1`.
 
+### Three more tools the config was already calling
+
+- **New modules: `eza`, `bat`, `direnv`** — all three in the `standard` profile.
+  Same shape as the ripgrep/fd/delta gap: the zsh module has pointed `ls`, `ll`,
+  `la` and `tree` at eza and `cat` at bat since 0.2.0, each behind a
+  `(( $+commands[...] ))` guard, and 50-tools.zsh has run `direnv hook zsh`
+  whenever the binary existed. Nothing installed any of them, so the guards were
+  false on every machine and the aliases silently stayed as the system's.
+- **bat has two names**, exactly like fd: Debian had already given
+  `/usr/bin/bat` to bacula, so its package installs `batcat`. The module accepts
+  either name and links a `bat` shim into `~/.local/bin`, removed on uninstall.
+- **eza publishes two builds per platform** and one of them is `_no_libgit` —
+  the same program with `--git` compiled out, which is the flag `ll` passes. The
+  two are indistinguishable by score, so which one you got came down to `sort`'s
+  collation and therefore to `$LC_COLLATE`. New `GH_ASSET_AVOID` in the
+  github_release provider settles it: a penalty, not a veto, so a platform where
+  the reduced build is the only asset still installs.
+- direnv is a bare binary rather than an archive (the provider already handled
+  that) and one Go build with no libc variants, so it works on the old-glibc
+  machines where the Rust tools need their musl asset.
+- `GH_TREE` and `GH_ASSET_AVOID` are now reset between modules. The engine loads
+  them into globals in one process; `GH_TREE` was never cleared, so a module
+  installed after nvim would have been treated as a directory tree.
+
 ### Downloads that are what the release says they are
 
 - **`github_release` now verifies what it downloaded.** The provider already

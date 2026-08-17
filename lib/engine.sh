@@ -50,7 +50,7 @@ _engine_load() {
     local mod="$1" dir="$ENVUP_HOME/modules/$1"
     NAME="$mod"; DESCRIPTION=""; DEPENDS=(); SELF_DEPS=()
     PROVIDERS=(); PKG_NAMES=(); PKG_DEFAULT=""
-    GH_REPO=""; GH_BIN=""; GH_ASSET=""; GH_STRIP=""
+    GH_REPO=""; GH_BIN=""; GH_ASSET=""; GH_STRIP=""; GH_TREE=""; GH_ASSET_AVOID=()
     GIT_URL=""; GIT_DEST=""; SCRIPT_URL=""; MANUAL_HINT=""
     VERIFY_BIN=""; VERIFY_MIN_VERSION=""; VERIFY_VERSION_ARG="--version"
     LINKS=(); CLEAN_PATHS=(); APPLIES_IF=""

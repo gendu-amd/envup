@@ -13,6 +13,8 @@
 #   GH_TREE   1 = the release is a directory tree, not a lone binary. Installs
 #             under ~/.local/opt/<module> and links its bin/* — nvim needs this
 #             because it will not start without its runtime/ directory.
+#   GH_ASSET_AVOID  tokens marking a deliberately reduced build of the same
+#             tool, so the full one wins the tie (eza's _no_libgit).
 #
 # The version is pinned in versions.lock when an entry exists. That is what
 # makes several machines agree: without a pin, two servers set up a week apart
@@ -150,6 +152,20 @@ _ghr_pick() {
             *)                   score=$((score + 2)) ;;   # a bare binary is fine too
         esac
         _ghr_wrong_artifact "$base" "$want" && score=$((score - 4))
+
+        # A release can carry a deliberately reduced build beside the full one:
+        # eza publishes eza_<platform>_no_libgit.tar.gz, the same program with
+        # `--git` compiled out — and `ll` in the zsh module passes --git. The two
+        # score identically on os, arch, libc and format, so the winner comes
+        # down to the order the assets happen to arrive in, which is `sort`'s
+        # opinion, which is $LC_COLLATE. Two machines, two different binaries.
+        #
+        # A penalty and not a veto: if the reduced build is the only asset for
+        # this platform, it still beats installing nothing.
+        local avoid
+        for avoid in ${GH_ASSET_AVOID[@]+"${GH_ASSET_AVOID[@]}"}; do
+            [[ "$base" == *"$avoid"* ]] && score=$((score - 3))
+        done
 
         if (( score > bestscore )); then bestscore=$score; best="$url"; fi
     done

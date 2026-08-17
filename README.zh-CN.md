@@ -36,7 +36,8 @@ cd envup
 # 忘了 --recursive？补一下：
 #   git submodule update --init --recursive
 
-# 安装 standard profile（zsh, git, tmux, fzf, ripgrep, fd, zoxide, atuin, delta）
+# 安装 standard profile（zsh, git, tmux, fzf, ripgrep, fd, bat, eza,
+# zoxide, atuin, delta, direnv）
 ./envup install
 
 # 或选更小的 profile
@@ -127,7 +128,7 @@ NFS/autofs 集群上很常见。由此引出两件事，envup 都处理了：
 | Profile | 模块 | 场景 |
 |---------|------|------|
 | `minimal` | `zsh git` | 裸服务器、无头容器 |
-| `standard`（默认） | `+ tmux fzf ripgrep fd zoxide atuin delta` | 典型开发机 |
+| `standard`（默认） | `+ tmux fzf ripgrep fd bat eza zoxide atuin delta direnv` | 典型开发机 |
 | `full` | `+ nvim` | 高级工作站 |
 
 Profile 通过 `use_profile` **组合**，每层只写自己新增的部分：
@@ -135,7 +136,7 @@ Profile 通过 `use_profile` **组合**，每层只写自己新增的部分：
 ```bash
 # profiles/standard.sh = minimal + 终端工具
 use_profile minimal
-MODULES+=(tmux fzf ripgrep fd zoxide atuin delta)
+MODULES+=(tmux fzf ripgrep fd bat eza zoxide atuin delta direnv)
 
 # profiles/full.sh = standard + 编辑器
 use_profile standard
