@@ -41,6 +41,31 @@ The copy goes out over OSC 52, so it works on any server without X11
 forwarding or root. It needs one setting in your terminal — see
 [docs/CLIPBOARD.md](CLIPBOARD.md).
 
+## Colours and `TERM`
+
+Inside a pane, `TERM` is `tmux-256color` — the entry tmux itself ships, and the
+only one that admits tmux can do italics. Where that entry is missing it is
+`screen-256color` instead, which every ncurses since the nineties has.
+
+Which one you get is decided at server start by asking `infocmp`, because naming
+a terminfo entry the machine does not have is not a cosmetic problem: colours go
+wrong and so do Home, End and the arrow keys. ncurses only added
+`tmux-256color` in 6.0, so CentOS 7 and its relatives fall back, as do the slim
+container images that ship no `infocmp` at all.
+
+```bash
+tmux show -s default-terminal    # which one this machine picked
+```
+
+One case the probe cannot see: a machine you `ssh` *to* from inside tmux
+inherits this `TERM` and may not know the entry either. If you have one of
+those, pin the old value for the machine you start tmux on:
+
+```bash
+# modules/tmux/files/hosts/<hostname>.conf
+set -g default-terminal "screen-256color"
+```
+
 ## Sessions that survive a reboot
 
 The machine goes down — a kernel update, a power event, someone else's OOM. You

@@ -129,6 +129,23 @@ changes — every addition is inert until you create the file that uses it.
   typing. Both the 0.10 (`goto_next`) and 0.11 (`vim.diagnostic.jump`) APIs are
   handled, since the NvChad pin here still supports 0.10.
 
+### A `TERM` that matches the machine
+
+- **`default-terminal` is `tmux-256color` where the entry exists, and
+  `screen-256color` where it does not.** It was unconditionally the latter,
+  which costs italics and makes tmux describe itself as something it is not.
+  Setting it unconditionally the other way is worse: ncurses added
+  `tmux-256color` in 6.0, and on a CentOS 7-era box naming a terminfo entry that
+  is not installed breaks colours *and* the Home, End and arrow keys.
+- Decided at server start by `infocmp`, so one config is right on both. Missing
+  `infocmp` — the slim container images drop `ncurses-bin` — takes the safe
+  branch quietly rather than printing `command not found` over your first
+  screen. `tmux show -s default-terminal` says which one you got.
+- The `Tc` truecolor override still globs on `*256col*`, which both names match.
+- The case the probe cannot see is an old machine you `ssh` *to* from inside
+  tmux: it inherits this `TERM`. Pin `screen-256color` in that machine's
+  `hosts/<hostname>.conf`. See [docs/TMUX.md](docs/TMUX.md).
+
 ### Project switching
 
 - **`prefix f` / `ts`** — fzf over your project roots, then attach-or-create a
