@@ -220,7 +220,7 @@ EOF
 _json_escape() { local str="$1"; str="${str//\\/\\\\}"; str="${str//\"/\\\"}"; printf '%s' "$str"; }
 
 _status_json() {
-    local first=1 m p desc probe state tool inst nbroken
+    local first=1 m p desc probe state tool inst n_unlinked n_dangling n_foreign
     # net is whatever a previous command already probed: status is read-only and
     # must not spend five seconds reaching for github to answer a local question.
     printf '{"platform":"%s","arch":"%s","pkg":"%s","priv":"%s","net":"%s","modules":[' \
@@ -229,16 +229,17 @@ _status_json() {
         probe="$(health_probe "$m")"
         state="$(health_field "$probe" state)"
         tool="$(health_field "$probe" tool)"
-        nbroken="$(health_records "$probe" link | grep -cEv '^(ok|skipped)	' || true)"
-        # An uninstalled module has no broken links, it has no links at all.
+        read -r n_unlinked n_dangling n_foreign < <(health_link_counts "$probe")
+        # An uninstalled module has no link problems, it has no links at all.
         # Reporting nine of them invites a consumer to "repair" nothing.
-        [[ "$state" == absent ]] && { inst=false; nbroken=0; } || inst=true
+        [[ "$state" == absent ]] && { inst=false; n_unlinked=0; n_dangling=0; n_foreign=0; } || inst=true
         desc="$(_json_escape "$(module_meta "$m" DESCRIPTION)")"
         (( first )) || printf ','; first=0
-        printf '{"name":"%s","description":"%s","installed":%s,"state":"%s","tool":"%s","provider":"%s","version":"%s","broken_links":%s}' \
+        printf '{"name":"%s","description":"%s","installed":%s,"state":"%s","tool":"%s","provider":"%s","version":"%s","link_issues":{"unlinked":%s,"dangling":%s,"foreign":%s}}' \
             "$m" "$desc" "$inst" "$state" "$tool" \
             "$(_json_escape "$(manifest_get "$m" provider)")" \
-            "$(_json_escape "$(manifest_get "$m" version)")" "${nbroken:-0}"
+            "$(_json_escape "$(manifest_get "$m" version)")" \
+            "${n_unlinked:-0}" "${n_dangling:-0}" "${n_foreign:-0}"
     done
     printf '],"profiles":['
     first=1
@@ -259,7 +260,7 @@ cmd_status() {
     esac
     log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG  Priv: $ENVUP_PRIV"
     echo; echo "Modules:"
-    local m probe state detail sym col
+    local m probe state detail sym col unlinked=0
     for m in $(modules_available); do
         probe="$(health_probe "$m")"
         state="$(health_field "$probe" state)"
@@ -269,7 +270,8 @@ cmd_status() {
             degraded) sym="~"; col="$C_YEL"
                       detail="$(printf '%s\n' "$probe" | awk -F'\t' '$1=="tool"{print $3; exit}')" ;;
             broken)   sym="!"; col="$C_RED"
-                      detail="$(health_records "$probe" link | grep -cEv '^(ok|skipped)	') broken link(s)" ;;
+                      detail="$(health_link_summary "$probe")"
+                      [[ "$detail" == *"not created yet"* ]] && unlinked=1 ;;
             absent)   sym="○"; col="" ;;
             *)        sym="?"; col="$C_RED"; detail="unreadable meta.sh" ;;
         esac
@@ -277,7 +279,11 @@ cmd_status() {
             "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC" \
             "${detail:+  — $detail}"
     done
-    echo "  ✓ ok   ~ degraded (config linked, tool missing or unusable)   ! broken   ○ not installed"
+    echo "  ✓ ok   ~ degraded (config linked, tool missing or unusable)   ! needs attention   ○ not installed"
+    # "not linked yet" is what you see after a git pull that added files to a
+    # module, and it is the one ! that means nothing is wrong — so say the
+    # command instead of leaving a red mark to worry about.
+    (( unlinked )) && log_hint "links the repo has grown since the last install: envup install <module> (or: envup doctor --fix)"
     echo; echo "Profiles:"
     local p; for p in $(profiles_available); do echo "  - $p"; done
 }

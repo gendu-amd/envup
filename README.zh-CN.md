@@ -70,7 +70,8 @@ exec zsh
 - `install --profile X MODULE...` 是**并集**，不是二选一。
 - `upgrade` 默认只重装 manifest 里已有的模块；用 `--profile` 可纳入 profile 新增的模块。
 - `upgrade --ref v0.2.0` 会切到指定 tag/分支（fetch + checkout + 子模块），用于**钉版本**。
-- `status` 反映**磁盘上此刻的真实状态**：重新读每一条软链、重新跑每一次版本检查。`✓ ok` / `~ degraded` / `! broken` / `○ 未安装`。手删了配置，下次 status 就是 `!`。
+- `status` 反映**磁盘上此刻的真实状态**：重新读每一条软链、重新跑每一次版本检查。`✓ ok` / `~ degraded` / `! 需要处理` / `○ 未安装`。手删了配置，下次 status 就是 `!`。
+- `!` 会说清是三种里的哪一种，因为处理方式不同：**`N links not created yet`**（repo 在你上次安装之后新增了软链，跑 `envup install <模块>` 即可，什么都没坏）、**`N dangling links`**（源文件或整个 checkout 被移动了，用 `envup doctor --fix`）、**`N paths already in use`**（你自己的文件正占着软链要去的位置，envup 只报告、不动你的文件）。
 - `doctor` 体检**这台机器**：软链、工具版本、manifest、子模块、`~/.local/bin` 是否在 PATH、locale 是否有效、仓库是否被移动或被污染。`--fix` 修完会**再查一遍**，所以干净退出的含义是"已修好"，而不是"我试过了"。
 - `doctor --authoring` 是另一半：静态校验仓库里的模块写法（元数据字段、钩子是否 function 包裹、`DEPENDS` 是否存在、有没有裸下载、`CLEAN_PATHS` 是否误含用户数据）。新增模块后跑一下。
 - `adopt` 处理"第三方安装脚本往你的托管配置里追加了几行"这种情况，见下文[配置同步](#配置同步)。

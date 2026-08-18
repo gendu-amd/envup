@@ -350,6 +350,24 @@ ones you never exercise on the machine you developed on.
   copied, because a hand-synced copy goes stale in both directions: a new field
   reported as a typo, and a typo accepted as a field.
 
+### `status` says which kind of link problem it is
+
+- **`! module — 2 broken link(s)` was wrong most of the time it appeared.**
+  Three different situations were counted together: a link that does not exist
+  yet, a link that dangles, and a path already occupied by a file of your own.
+  The common one by far is the first — you pull a repo that grew a new helper
+  script or config file, and the machines that have not re-installed report it —
+  and there is nothing broken about it. It now reads `2 links not created yet`,
+  `1 dangling link` or `1 path already in use`, listed together when a module
+  has more than one kind, and a run with any of the first prints the command
+  that fixes it. The legend calls `!` *needs attention* rather than *broken*.
+- **`status --json`: `broken_links` is replaced by `link_issues`**, an object of
+  `{unlinked, dangling, foreign}`. The old field's number is still the sum, but
+  it is a rename rather than a redefinition on purpose: a consumer reading
+  `.broken_links` now gets nothing instead of a number that quietly means
+  something else.
+- `doctor` already named each link and its state; only `status` collapsed them.
+
 ### Every downloadable tool is pinned
 
 - **`versions.lock` covers all ten `github_release` modules**, not four. ripgrep,

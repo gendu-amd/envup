@@ -168,6 +168,69 @@ EOF
     [[ "$output" == ok* ]]
 }
 
+# ---- saying which kind of link problem it is -----------------------------
+#
+# All three states used to be printed as "N broken link(s)". The common one is
+# a link the repo grew since this machine last installed — nothing is damaged,
+# `envup install` creates it — and calling that "broken" sent a real user
+# looking for damage that was not there.
+
+@test "health_link_summary: a link the repo added and nobody has created yet" {
+    mk_meta cfg 'LINKS=("files/thing:$HOME/.thing" "files/other:$HOME/.other")'
+    ln -s "$ENVUP_HOME/files/thing" "$HOME/.thing"
+    manifest_add cfg
+    run health_link_summary "$(health_probe cfg)"
+    [ "$output" = "1 link not created yet" ]
+}
+
+@test "health_link_summary: counts read as English, singular and plural" {
+    mk_meta cfg 'LINKS=("files/a:$HOME/.a" "files/b:$HOME/.b" "files/c:$HOME/.c")'
+    manifest_add cfg
+    run health_link_summary "$(health_probe cfg)"
+    [ "$output" = "3 links not created yet" ]
+}
+
+@test "health_link_summary: a dangling link is not the same sentence" {
+    mk_meta cfg 'LINKS=("files/thing:$HOME/.thing")'
+    ln -s "$ENVUP_HOME/files/gone" "$HOME/.thing"     # ours, source absent
+    manifest_add cfg
+    run health_link_summary "$(health_probe cfg)"
+    [ "$output" = "1 dangling link" ]
+}
+
+@test "health_link_summary: your own file in the way says so" {
+    mk_meta cfg 'LINKS=("files/thing:$HOME/.thing")'
+    printf 'mine\n' > "$HOME/.thing"
+    manifest_add cfg
+    run health_link_summary "$(health_probe cfg)"
+    [ "$output" = "1 path already in use" ]
+}
+
+@test "health_link_summary: mixed problems are listed, not merged" {
+    mk_meta cfg 'LINKS=("files/a:$HOME/.a" "files/b:$HOME/.b")'
+    printf 'mine\n' > "$HOME/.b"
+    manifest_add cfg
+    run health_link_summary "$(health_probe cfg)"
+    [ "$output" = "1 link not created yet, 1 path already in use" ]
+}
+
+@test "health_link_counts: the numbers status --json prints" {
+    mk_meta cfg 'LINKS=("files/a:$HOME/.a" "files/b:$HOME/.b" "files/c:$HOME/.c")'
+    ln -s "$ENVUP_HOME/files/gone" "$HOME/.a"
+    printf 'mine\n' > "$HOME/.c"
+    manifest_add cfg
+    run health_link_counts "$(health_probe cfg)"
+    [ "$output" = "1 1 1" ]        # not-created-yet, dangling, in-the-way
+}
+
+@test "health_link_counts: a healthy module counts nothing" {
+    mk_meta cfg 'LINKS=("files/thing:$HOME/.thing")'
+    ln -s "$ENVUP_HOME/files/thing" "$HOME/.thing"
+    manifest_add cfg
+    run health_link_counts "$(health_probe cfg)"
+    [ "$output" = "0 0 0" ]
+}
+
 # ---- drift ---------------------------------------------------------------
 
 git_repo() {

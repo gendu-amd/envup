@@ -102,6 +102,51 @@ health_field() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1 == k { print $2; 
 # health_records <probe-output> <key> — every record of that kind, key stripped.
 health_records() { printf '%s\n' "$1" | awk -F'\t' -v k="$2" '$1 == k { sub(/^[^\t]*\t/, ""); print }'; }
 
+# health_link_counts <probe-output> — "<not-linked-yet> <dangling> <in-the-way>",
+# the three ways a declared link can fail to be a working link. Separate from
+# the summary below because `status --json` reports the numbers and the terminal
+# reports the sentence, and they must not be able to disagree.
+health_link_counts() {
+    local line st n_missing=0 n_broken=0 n_foreign=0
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        st="${line%%$'\t'*}"
+        case "$st" in
+            missing) n_missing=$((n_missing + 1)) ;;
+            broken)  n_broken=$((n_broken + 1)) ;;
+            foreign) n_foreign=$((n_foreign + 1)) ;;
+        esac
+    done < <(health_records "$1" link)
+    printf '%s %s %s\n' "$n_missing" "$n_broken" "$n_foreign"
+}
+
+# health_link_summary <probe-output> — why this module reads '!', in the words
+# of what is actually wrong with its links.
+#
+# `status` used to call all three states "N broken link(s)", which was a small
+# inaccuracy with a large cost. The common case by far is a link the repo grew
+# after this machine last installed — a new helper script, a new config file —
+# and there is nothing broken about it: nobody has run `envup install` since.
+# "Broken" sends you looking for damage. The other two states want different
+# hands entirely: a dangling link means the source moved or the checkout did,
+# and a foreign one means your own file is sitting where a link should go and
+# envup will not touch it without your say-so.
+health_link_summary() {
+    local n_missing n_broken n_foreign
+    read -r n_missing n_broken n_foreign < <(health_link_counts "$1")
+
+    # <n> <singular> <plural> — the phrase is the whole detail, not a fragment
+    # something else appends "link(s)" to.
+    _phrase() { (( $1 == 1 )) && printf '%s' "$2" || printf '%s' "${3//<n>/$1}"; }
+
+    local out=""
+    (( n_missing )) && out="$(_phrase "$n_missing" "1 link not created yet" "<n> links not created yet")"
+    (( n_broken ))  && out="${out:+$out, }$(_phrase "$n_broken" "1 dangling link" "<n> dangling links")"
+    (( n_foreign )) && out="${out:+$out, }$(_phrase "$n_foreign" "1 path already in use" "<n> paths already in use")"
+    unset -f _phrase
+    printf '%s' "${out:-link problem}"
+}
+
 # ---- the repo itself -----------------------------------------------------
 # health_drift — managed files that differ from what is committed, one
 # `<git-status><TAB><repo-relative-path>` per line.
