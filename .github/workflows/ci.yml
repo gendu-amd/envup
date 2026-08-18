@@ -5,6 +5,13 @@ on:
     branches: [main, refactor]
   pull_request:
 
+# Third-party actions are pinned to a commit SHA, with the version in a comment.
+# A tag is a movable label: whoever can push to actions/checkout can repoint v4
+# at anything, and this workflow has a checkout of the repo and the runner's
+# token. envup verifies the digest of every binary it downloads onto your
+# machine; holding its own CI to a lower standard would be an odd place to stop.
+# Dependabot bumps these (.github/dependabot.yml) and rewrites the comment.
+
 # Cancel superseded runs on the same ref.
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,7 +22,7 @@ jobs:
     name: lint (shellcheck + bash -n)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint shell sources
@@ -25,7 +32,7 @@ jobs:
     name: unit (bats)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # zsh is a test dependency, not just a module: tests/unit/zshconfig.bats
       # starts real interactive shells to assert the slice order, PATH dedup and
       # conditional locale/EDITOR behaviour. Without zsh those tests skip, and a
@@ -43,7 +50,7 @@ jobs:
     name: integration (dry-run + cli)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Install bats + jq
         run: sudo apt-get update && sudo apt-get install -y bats jq
       - name: Run integration tests
@@ -53,7 +60,7 @@ jobs:
     name: no-root install (unprivileged container)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
       # The scenario envup 0.2 exists for: a server where you have an account
@@ -83,7 +90,7 @@ jobs:
     name: offline install (no network egress)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: recursive
       - name: Install zsh
@@ -112,7 +119,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # macOS ships bash 3.2; envup re-execs into Homebrew bash (>= 4). Install
       # it so that path is exercised in CI.
       - name: Install bash >= 4 (macOS)
@@ -127,19 +134,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [fedora:latest, archlinux:latest, alpine:latest]
+        # debian:11 is not a fourth flavour of Linux, it is the *old glibc* row.
+        # It ships glibc 2.31, below the 2.34 that current prebuilt binaries are
+        # built against — which is the failure mode envup exists to survive, and
+        # the one every other image here hides: a binary installs perfectly and
+        # then dies on every call with "version `GLIBC_2.34' not found". alpine
+        # covers musl, fedora and arch are both newer than the runner. Without
+        # this row nothing in CI runs on a machine older than the CI machine,
+        # and old machines are the ones you cannot upgrade.
+        image: [fedora:latest, archlinux:latest, alpine:latest, debian:11]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # Run the smoke test inside each distro via docker (checkout stays on the
       # host, so we avoid node-in-container issues). Each distro installs bash +
       # git with its own package manager, then runs the smoke script.
       - name: Smoke in ${{ matrix.image }}
         run: |
-          docker run --rm -v "$PWD:/src" -w /src "${{ matrix.image }}" sh -c '
+          docker run --rm -v "$PWD:/src" -w /src -e DEBIAN_FRONTEND=noninteractive \
+            "${{ matrix.image }}" sh -c '
             set -e
             if command -v dnf >/dev/null 2>&1; then dnf install -y git bash >/dev/null;
             elif command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm git bash >/dev/null;
             elif command -v apk >/dev/null 2>&1; then apk add --no-cache git bash >/dev/null;
+            elif command -v apt-get >/dev/null 2>&1; then apt-get update -qq >/dev/null && apt-get install -y -qq git bash >/dev/null;
             fi
             bash tests/integration/smoke.sh
           '

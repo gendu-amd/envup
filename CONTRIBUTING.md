@@ -205,7 +205,9 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   targets are exactly the ones where it may not start). `tmuxrestore`
   also guards a removal: no zsh slice may start a tmux server. Attaching used to
   happen at login, and it is the kind of convenience that gets re-added by
-  someone who never hit the failure it causes.
+  someone who never hit the failure it causes. One file tests no code at all:
+  `release` checks that `VERSION`, `CHANGELOG.md` and `git tag` still agree —
+  see [Releasing](#releasing).
 - **Scripts under `modules/*/files/bin/`** are first-party sources: `lint.sh`
   covers them, and they get behavioural tests, not grep tests — see
   `tests/unit/sessionizer.bats`, which stubs `tmux` and `fzf` to exercise the
@@ -226,9 +228,19 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
 ## Releasing
 
 1. Update [`CHANGELOG.md`](CHANGELOG.md): move `[Unreleased]` items under a new
-   `[X.Y.Z]` heading (dated).
+   `[X.Y.Z]` heading (dated), and add the compare link at the bottom of the
+   file — both `[X.Y.Z]` and the new `[Unreleased]` range.
 2. Bump [`VERSION`](VERSION) to `X.Y.Z` (drop the `-dev` suffix).
 3. Commit (`chore: release vX.Y.Z`) and tag: `git tag -a vX.Y.Z -m "vX.Y.Z"`.
 4. Users pin to it with `envup upgrade --ref vX.Y.Z`.
 
 `envup --version` reads `VERSION` (falling back to `git describe --tags`).
+
+Steps 1–3 have to agree with each other, and nothing about the repo looks wrong
+when they don't — 0.2.0 was written up, dated and shipped without ever being
+tagged, so the version the README named could not be checked out.
+`tests/unit/release.bats` now checks all three: `VERSION` against the newest
+dated section, every heading against its link definition, and every documented
+version against `git tag`. It skips the tag check where tags are unavailable (a
+shallow CI checkout, a source tarball), so run the suite in a full clone before
+you announce anything.

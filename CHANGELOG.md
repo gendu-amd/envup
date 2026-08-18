@@ -350,6 +350,40 @@ ones you never exercise on the machine you developed on.
   copied, because a hand-synced copy goes stale in both directions: a new field
   reported as a typo, and a typo accepted as a field.
 
+### A release you can check out, from a CI you can pin
+
+- **0.2.0 is tagged.** It had a heading, a date and a migration guide, and no
+  tag — so `envup upgrade --ref v0.2.0`, the command the README gives for
+  pinning a fleet to a known release, failed on the only release worth pinning
+  to. The tag points at the commit that bumped `VERSION`, dated to match.
+- **Every version heading in this file is now a link** to the diff that produced
+  it, the way Keep a Changelog intends. They live at the bottom of the file.
+- **`tests/unit/release.bats`** checks the three things that have to agree and
+  that nothing else looks at: `VERSION` against the newest dated section, each
+  heading against its link definition, each documented version against
+  `git tag`. All three are updated by hand from a checklist, the checklist was
+  followed once and missed once, and a missing tag is invisible from inside the
+  repo. The tag check skips where tags aren't fetched (shallow CI checkout,
+  source tarball) rather than failing on them.
+- **GitHub Actions are pinned to commit SHAs**, version in a trailing comment. A
+  tag is a movable label: whoever can push to `actions/checkout` can repoint
+  `v4`, and this workflow holds a checkout of the repo and the runner's token.
+  envup verifies the digest of every binary it puts on your machine; its own CI
+  was the odd place to stop.
+- **Dependabot** (`.github/dependabot.yml`) covers the two supply chains that
+  exist here and had no update channel at all: those actions, and the git
+  submodules under `modules/*/files`, whose contents are sourced into every
+  interactive shell on every machine envup has touched. Submodule bumps are
+  grouped — eleven PRs a month is how a bot gets muted. The downloaded binaries
+  stay out of it: they're pinned in `versions.lock` and digest-checked by
+  `lib/net.sh`, which Dependabot cannot see.
+- **CI runs on a machine older than the CI machine.** The container matrix
+  gained `debian:11` — glibc 2.31, below the 2.34 that current prebuilt binaries
+  are built against. That is the failure envup exists to survive — a tool that
+  installs perfectly and then dies on every call with a missing GLIBC symbol —
+  and every other image hid it: alpine is musl, fedora and arch are both newer
+  than the runner.
+
 ### Internals
 
 - **`lib/upgrade.sh`** — the `git` half of `cmd_upgrade`, which had been two
@@ -601,3 +635,11 @@ First public release.
 
 - English + `README.zh-CN.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `TMUX.md`,
   issue/PR templates, `CODE_OF_CONDUCT.md`, `SECURITY.md`.
+
+<!-- Every version heading above is a link to the diff that produced it. Keep a
+     Changelog puts these at the bottom; tests/unit/release.bats checks that a
+     new section never ships without one. -->
+
+[Unreleased]: https://github.com/gendu-amd/envup/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/gendu-amd/envup/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/gendu-amd/envup/releases/tag/v0.1.0
