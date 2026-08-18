@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# ============================================
+# tmux-resume — get back to what you were working on
+# ============================================
+# Plain `tmux` after a reboot is the wrong command, and it fails in a way that
+# looks like the feature is broken rather than like you typed the wrong thing:
+# starting the server triggers tmux-continuum's restore, but that restore is
+# asynchronous (it sleeps a second so tmux can finish sourcing its plugins)
+# while your `tmux` created a session *immediately*. You land in an empty
+# session named "0" and your real layout quietly appears beside it, one window
+# switch away, with nothing on screen to say so.
+#
+# `tmux attach` is the wrong command too when no server is running yet: there
+# is nothing to attach to, so it just fails and never triggers the restore.
+#
+# This does the sequence that works:
+#
+#   server already up   → attach to it, restore is long done or not wanted
+#   nothing saved       → start a session, there is nothing to wait for
+#   a save on disk      → start the server, wait for the sessions to appear,
+#                         attach to what came back
+#
+# It is a command you run, not a login hook. Doing this from .zshrc was written
+# and then dropped before it shipped: an automatic path has to guess whether
+# *this* connection wants a multiplexer, and when the guess is wrong you arrive
+# in a session that is not the one you left — which is the exact failure this
+# file exists to prevent. Type `tmux-resume` (or `tm`) when you want it.
+#
+#   ENVUP_TMUX_SESSION=name    what to create when there is nothing to restore
+#   ENVUP_TMUX_RESTORE_WAIT=8  seconds to wait for the restore before giving up
+# ============================================
+
+set -u
+
+case "${1:-}" in
+    -h|--help)
+        cat <<'USAGE'
+Usage: tmux-resume
+
+Attach to your tmux layout, restoring it first if the server is not running.
+Run it instead of `tmux` after a reboot — plain `tmux` races the restore and
+leaves you in an empty session beside it.
+
+  ENVUP_TMUX_SESSION=name      session to create when nothing was saved (main)
+  ENVUP_TMUX_RESTORE_WAIT=8    seconds to wait for the restore
+USAGE
+        exit 0 ;;
+    "") ;;
+    *)  echo "tmux-resume: unknown argument: $1" >&2; exit 1 ;;
+esac
+
+command -v tmux >/dev/null 2>&1 || { echo "tmux-resume: tmux is not installed" >&2; exit 1; }
+
+# Nesting a client inside its own server is not a thing tmux can do, and the
+# error it gives ("sessions should be nested with care") does not say which of
+# your windows you are already in.
+[[ -z "${TMUX:-}" ]] || { echo "tmux-resume: already inside tmux" >&2; exit 1; }
+
+# Where tmux-resurrect keeps its saves. Asked rather than recomputed: resurrect
+# expands $HOME/$HOSTNAME/~ inside @resurrect-dir, honours a value set from
+# ~/.tmux/host.conf, and has a legacy location it still prefers if it exists.
+# A second copy of those rules here would drift, and this is the copy that would.
+_resurrect_dir() {
+    local helpers="$HOME/.tmux/plugins/tmux-resurrect/scripts/helpers.sh" dir=
+    if [[ -r "$helpers" ]]; then
+        dir="$(source "$helpers" >/dev/null 2>&1; resurrect_dir 2>/dev/null)"
+    fi
+    printf '%s' "${dir:-${XDG_DATA_HOME:-$HOME/.local/share}/tmux/resurrect}"
+}
+
+# A server is already up — another connection, or you just detached from this
+# one. Nothing to restore, just join it.
+if tmux has-session 2>/dev/null; then
+    exec tmux attach
+fi
+
+# Starting the server is what triggers continuum's restore.
+tmux start-server 2>/dev/null || { echo "tmux-resume: could not start a tmux server" >&2; exit 1; }
+
+# Wait for it — but only when there is something to wait for. With no save file
+# the restore is a no-op and a first run would pay the full timeout for nothing.
+if [[ -e "$(_resurrect_dir)/last" ]]; then
+    # `sleep 0.2` is whole-seconds on a few systems and an error on a few more;
+    # find out once instead of per iteration.
+    nap=0.2; sleep "$nap" 2>/dev/null || nap=1
+    limit=$(( ${ENVUP_TMUX_RESTORE_WAIT:-8} * 5 )); ticks=0
+    [[ "$nap" == 1 ]] && limit=${ENVUP_TMUX_RESTORE_WAIT:-8}
+    until tmux has-session 2>/dev/null || (( ticks >= limit )); do
+        sleep "$nap"
+        ticks=$(( ticks + 1 ))
+    done
+    # Attaching while the restore is still running is fine and looks good — you
+    # watch the windows arrive. Waiting for it to *finish* would mean guessing
+    # at how long, which is worse than joining early.
+fi
+
+if tmux has-session 2>/dev/null; then
+    exec tmux attach
+else
+    exec tmux new-session -s "${ENVUP_TMUX_SESSION:-main}"
+fi

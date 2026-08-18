@@ -297,11 +297,15 @@ Three things the tmux module adds that only matter over SSH:
 
 **A reboot does not cost you your session.** The layout you were working in —
 windows, panes, directories, scrollback, the files open in nvim — is saved every
-five minutes, and logging back in puts you straight back into it. Nothing to
-type: the login shell starts the tmux server, waits for the restore, and attaches.
-Saves are kept per machine, so a home directory shared over NFS does not hand you
-the build box's layout on the GPU box. `NO_TMUX=1 ssh box` for a connection where
-you want a plain shell. See [docs/TMUX.md](docs/TMUX.md).
+five minutes. Log back in and type `tm` (`tmux-resume`) to land back in it.
+That command exists because plain `tmux` is the wrong one here: starting the
+server is what triggers the restore, but the restore is asynchronous, so `tmux`
+puts you in a new empty session and your real layout arrives beside it a moment
+later. `tm` starts the server, waits, and attaches to what came back. Nothing
+attaches automatically — a login hook has to guess whether this connection wants
+a multiplexer, and a wrong guess is how you end up in a session that isn't
+yours. Saves are kept per machine, so a home directory shared over NFS does not
+hand you the build box's layout on the GPU box. See [docs/TMUX.md](docs/TMUX.md).
 
 **Copy lands on your laptop.** Yank in nvim or copy in tmux and the text goes to the
 clipboard of the machine you are sitting at, carried by the SSH connection you

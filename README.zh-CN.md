@@ -180,7 +180,7 @@ CLEAN_PATHS=()
 
 tmux 模块里有三件事只在 SSH 场景下才有意义：
 
-**重启不会让你丢掉现场。** 你正在用的那套布局 —— 窗口、pane、各自的目录、回滚缓冲、nvim 里开着的文件 —— 每 5 分钟存一次，重新登录就直接回到那个状态。不用敲任何东西：登录 shell 会拉起 tmux server，等恢复跑完，然后 attach。存档按机器分开，所以 NFS 共用 home 时不会在 GPU 机器上给你恢复出编译机的布局。想要一个干净 shell 就 `NO_TMUX=1 ssh box`。见 [docs/TMUX.md](docs/TMUX.md)。
+**重启不会让你丢掉现场。** 你正在用的那套布局 —— 窗口、pane、各自的目录、回滚缓冲、nvim 里开着的文件 —— 每 5 分钟存一次；重新登录后敲一个 `tm`（全名 `tmux-resume`）就回到那个状态。**这个命令存在是因为直接敲 `tmux` 是错的**：拉起 server 才会触发恢复，但恢复是异步的（要先 sleep 1 秒等插件加载完），而你的 `tmux` 已经立刻建好了一个空 session —— 你会停在一个空壳里，真正的布局一秒后出现在旁边，屏幕上没有任何提示。`tm` 会拉起 server、等恢复落地、再 attach 到回来的那些 session 上。**登录时不会自动帮你 attach**：自动路径必须替你猜"这条连接要不要 multiplexer"，猜错的结果就是把你丢进一个不是你原来那个的 session。存档按机器分开，所以 NFS 共用 home 时不会在 GPU 机器上给你恢复出编译机的布局。见 [docs/TMUX.md](docs/TMUX.md)。
 
 **复制的东西落到你自己的电脑上。** 在 nvim 里 yank、或在 tmux 里复制，文字会经由你已经建好的那条 SSH 连接，进到你面前这台机器的剪贴板 —— 不需要 X11 转发、不需要 root、不需要额外的守护进程。但它需要你**本地终端**上的一个开关，这个 envup 管不到：见 [docs/CLIPBOARD.md](docs/CLIPBOARD.md)。（VS Code 和 Cursor 默认是关的。）
 

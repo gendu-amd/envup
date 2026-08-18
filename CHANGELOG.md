@@ -47,18 +47,28 @@ changes — every addition is inert until you create the file that uses it.
 
 ### Sessions that survive a reboot
 
-- **Logging in restores what the reboot interrupted.** New zsh slice
-  `90-tmux.zsh`: on an interactive login it starts a tmux server if none is
-  running, waits for tmux-continuum's (asynchronous) restore rather than racing
-  it into an empty session, and attaches. resurrect and continuum were already
-  configured — the missing half was that after a reboot nothing ever started a
-  server, so the saved layout sat in a file waiting for you to remember it.
-  Guarded against every context where a multiplexer is wrong: no tty
-  (`scp`, `rsync`, `ssh box cmd`), already inside tmux or screen, an editor's
-  integrated terminal, no tmux installed. Escape hatches: `NO_TMUX=1` for one
-  connection, `ENVUP_TMUX_AUTOATTACH=0` for a machine. It does not `exec`, so a
-  tmux that refuses to start cannot lock you out of a box you can only reach
-  over SSH.
+- **`tmux-resume` (short name `tm`) puts you back in what the reboot
+  interrupted.** resurrect and continuum were already configured; the missing
+  half was the command you type afterwards. Plain `tmux` is the wrong one and
+  fails in a way that reads as "the restore is broken": starting the server is
+  what triggers continuum's restore, but that restore is asynchronous — it
+  sleeps a second so tmux can finish sourcing its plugins — while your `tmux`
+  created a session immediately, so you land in an empty `0` and your real
+  layout arrives beside it with nothing on screen to say so. `tmux attach` is no
+  better before the server is up: nothing to attach to, and the restore is never
+  triggered. `tmux-resume` attaches to a running server, or starts one, waits
+  for the sessions to appear, and attaches to those — and only waits when there
+  is a save file, so a first run doesn't pay the timeout to learn there was
+  nothing to restore.
+- **Nothing attaches for you at login.** An interactive-login hook was written
+  first (`90-tmux.zsh`) and removed before release. Deciding automatically
+  whether *this* connection wants a multiplexer means sometimes deciding wrong,
+  and a wrong guess drops you into a session that is not the one you left —
+  which is the failure the whole feature exists to prevent, now arriving by a
+  route you didn't ask for. `tests/unit/tmuxrestore.bats` asserts no zsh slice
+  starts a tmux server, so it cannot come back by accident. Want it on one
+  machine? One line in `~/.zshrc.d/hosts/<machine>.zsh`, with the guards you
+  choose: `[[ -o interactive && -z "$TMUX" && -t 0 ]] && tmux-resume`.
 - **One resurrect save directory per machine**
   (`~/.local/share/tmux/resurrect/$HOSTNAME`). The default is a single shared
   path, which on a home directory mounted over NFS means every machine writes

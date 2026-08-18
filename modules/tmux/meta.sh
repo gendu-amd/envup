@@ -38,9 +38,10 @@ unset _p
 # `envup install tmux` to pick it up.
 LINKS+=("?modules/tmux/files/hosts/${ENVUP_HOST}.conf:$HOME/.tmux/host.conf")
 
-# Not config: a helper the tmux binding and the shell both call. It rides with
-# tmux because it is useless without it.
+# Not config: helpers the tmux bindings and the shell both call. They ride with
+# tmux because they are useless without it.
 LINKS+=("modules/tmux/files/bin/tmux-sessionizer:$HOME/.local/bin/tmux-sessionizer")
+LINKS+=("modules/tmux/files/bin/tmux-resume:$HOME/.local/bin/tmux-resume")
 
 # Deliberately empty. resurrect/continuum saves under
 # ~/.local/share/tmux/resurrect/ are the layout you were last working in —

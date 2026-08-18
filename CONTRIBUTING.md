@@ -192,7 +192,7 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   `hosts` (the per-machine layer across all four modules, and its load order),
   `gitconfig` (that the committed config names no binary, and the generated
   `~/.gitconfig.envup` lifecycle), `clipboard` (the OSC 52 settings, each of
-  which fails silently when wrong), `tmuxrestore` (the login hook, the
+  which fails silently when wrong), `tmuxrestore` (`tmux-resume`, the
   per-machine resurrect directory, and nvim's `Session.vim`), `searchtools`
   (ripgrep / fd / delta, whose whole difficulty is that the package, the binary
   and the module go by three different names), `shelltools` (eza, bat and
@@ -203,9 +203,9 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   and `nvimconfig` (the editor
   config as text — nothing there runs neovim, because the machines this repo
   targets are exactly the ones where it may not start). `tmuxrestore`
-  runs the login hook on a real terminal via zsh's own `zsh/zpty` — a hook whose
-  job is to decide whether it is talking to a person cannot be tested from a
-  pipe, where every guard trips and every test passes for the wrong reason.
+  also guards a removal: no zsh slice may start a tmux server. Attaching used to
+  happen at login, and it is the kind of convenience that gets re-added by
+  someone who never hit the failure it causes.
 - **Scripts under `modules/*/files/bin/`** are first-party sources: `lint.sh`
   covers them, and they get behavioural tests, not grep tests — see
   `tests/unit/sessionizer.bats`, which stubs `tmux` and `fzf` to exercise the

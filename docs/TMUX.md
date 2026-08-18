@@ -69,8 +69,8 @@ set -g default-terminal "screen-256color"
 ## Sessions that survive a reboot
 
 The machine goes down — a kernel update, a power event, someone else's OOM. You
-log back in and your windows, panes, working directories, scrollback and open
-files are where you left them. You do not type anything to make that happen.
+log back in, type one command, and your windows, panes, working directories,
+scrollback and open files are where you left them.
 
 Three pieces, and all three have to be there:
 
@@ -78,7 +78,7 @@ Three pieces, and all three have to be there:
 |---|---|
 | tmux-resurrect | writes the session tree to a file |
 | tmux-continuum | saves every 5 minutes; restores when a tmux server starts |
-| `~/.zshrc.d/90-tmux.zsh` | starts that server when you log in |
+| `tmux-resume` (`tm`) | starts that server, waits for the restore, attaches |
 
 | Keys | Does |
 |---|---|
@@ -95,29 +95,47 @@ the same file and the last save wins — you log into the build box and it hands
 you the layout you left on the GPU box. Not `/tmp` either way, so a reboot does
 not take them, and envup's `clean` never touches them.
 
-### Logging in
-
-The login hook is the piece that was missing: without it your layout sat in a
-file waiting for you to remember to type `tmux`. On an interactive login it
-starts a server if none is running, waits for continuum's restore (which is
-asynchronous — creating a session too early would leave you in an empty shell
-with the real work restored behind it), and attaches.
-
-It stays out of the way when it should: not for `scp`/`rsync`/`ssh box cmd`, not
-inside an existing tmux or screen, not in VS Code's or Cursor's integrated
-terminal, and not when tmux is missing. It does not `exec`, so detaching leaves
-you in a normal shell and a broken tmux cannot lock you out of the machine.
+### Coming back: type `tm`, not `tmux`
 
 ```bash
-NO_TMUX=1 ssh box            # just this connection
+tm            # or the full name, tmux-resume
 ```
+
+**Plain `tmux` is the wrong command after a reboot**, and it fails in a way that
+looks like the restore is broken rather than like you typed the wrong thing.
+Starting the server is what triggers continuum's restore, but that restore is
+asynchronous — it sleeps a second so tmux can finish sourcing its plugins —
+while your `tmux` created a session *immediately*. You land in an empty session
+named `0`, and your real layout appears beside it a moment later, one window
+switch away, with nothing on screen to say so.
+
+`tmux attach` is no better when the server is not running yet: there is nothing
+to attach to, so it fails and never triggers the restore at all.
+
+`tmux-resume` does the sequence that works:
+
+| Situation | What it does |
+|---|---|
+| a server is already up | attaches to it |
+| nothing saved | starts a session — there is nothing to wait for |
+| a save on disk | starts the server, waits for the sessions to appear, attaches |
 
 ```bash
 # ~/.zshrc.d/hosts/<machine>.zsh — this machine, permanently
-ENVUP_TMUX_AUTOATTACH=0      # never
-ENVUP_TMUX_AUTOATTACH=1      # yes, even in an editor terminal
 ENVUP_TMUX_SESSION=work      # name for the session created when nothing restores
 ENVUP_TMUX_RESTORE_WAIT=8    # seconds to wait for a restore before giving up
+```
+
+**Nothing runs it for you at login.** An earlier version attached automatically
+from `.zshrc`, and it was removed: an automatic path has to guess whether *this*
+connection wants a multiplexer, and every wrong guess puts you in a session that
+is not the one you left — which is the exact failure the feature exists to
+prevent. If you want it back for one machine, that is one line in
+`~/.zshrc.d/hosts/<machine>.zsh` or `~/.zshrc.local`, where the guards are yours
+to write:
+
+```bash
+[[ -o interactive && -z "$TMUX" && -t 0 ]] && tmux-resume
 ```
 
 ### nvim panes

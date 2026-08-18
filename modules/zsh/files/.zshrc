@@ -15,7 +15,11 @@
 #   65-func      functions
 #   70-host      hosts/<hostname>.zsh — committed per-machine config
 #   80-local     ~/.zshrc.local — personal, never committed, wins over all
-#   90-tmux      attach to tmux, restoring what the last reboot interrupted
+#
+# Nothing here starts tmux. Attaching is a command you type (`tm`), because a
+# login hook has to guess whether this connection wants a multiplexer and a
+# wrong guess lands you in a session that is not the one you left. Put the guard
+# you want in 70-host or 80-local if you disagree — see docs/TMUX.md.
 #
 # The numbers replaced a hand-maintained list in this file. The list kept the
 # order readable but let it be wrong: tools loaded before platform, so on macOS

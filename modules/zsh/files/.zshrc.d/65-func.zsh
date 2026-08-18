@@ -39,6 +39,13 @@ if [[ -x "$HOME/.local/bin/tmux-sessionizer" ]] && ! command -v ts >/dev/null 2>
     ts() { "$HOME/.local/bin/tmux-sessionizer" "$@" }
 fi
 
+# Come back to the layout you left. Not run for you at login: `tmux-resume` is
+# the command, this is just the short name. See modules/tmux/files/bin for why
+# plain `tmux` is the wrong thing to type after a reboot.
+if [[ -x "$HOME/.local/bin/tmux-resume" ]] && ! command -v tm >/dev/null 2>&1; then
+    tm() { "$HOME/.local/bin/tmux-resume" "$@" }
+fi
+
 # Terminal size fix for SSH/tmux/Docker
 _update_terminal_size() {
     if command -v stty &>/dev/null; then
