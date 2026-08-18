@@ -350,6 +350,23 @@ ones you never exercise on the machine you developed on.
   copied, because a hand-synced copy goes stale in both directions: a new field
   reported as a typo, and a typo accepted as a field.
 
+### Every downloadable tool is pinned
+
+- **`versions.lock` covers all ten `github_release` modules**, not four. ripgrep,
+  fd, delta, bat, eza and direnv were taking whatever was latest on the day each
+  machine was set up — so the fleet agreed about fzf, zoxide, atuin and nvim and
+  quietly disagreed about the rest. A half-pinned fleet is worse than an unpinned
+  one: the tools that differ between two servers are the ones nobody chose, and
+  nothing in `status` says which they are.
+- **`tests/unit/providers.bats` now checks the file, not just the mechanism.**
+  Three guards: every module whose `PROVIDERS` include `github_release` has a
+  line, no line names a module that no longer installs that way, and each tag is
+  shaped like a tag. The lockfile is edited by hand and nothing bumps it —
+  Dependabot cannot see it — so the failure mode is a new module shipping
+  unpinned and nobody noticing for a year.
+- Tags are upstream's spelling, verbatim: ripgrep and delta publish `15.2.0`,
+  everything else `v15.2.0`. Constructing one from a version number 404s.
+
 ### A release you can check out, from a CI you can pin
 
 - **0.2.0 is tagged.** It had a heading, a date and a migration guide, and no

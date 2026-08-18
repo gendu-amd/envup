@@ -7,11 +7,27 @@
 # machines to agree — two servers set up a week apart otherwise end up on
 # different builds, and the difference surfaces later as a mystery.
 #
-# To pin: run `envup status` (or look at the install log) for the tag that was
-# actually used, add the line, commit it. To unpin: delete the line.
+# Every module that can install from a GitHub release is pinned here, and
+# `tests/unit/providers.bats` fails if a new one is not: a half-pinned fleet is
+# the worst of both, because the machines that disagree are exactly the ones
+# nobody thought about. Nothing bumps these for you — Dependabot cannot see this
+# file (see .github/dependabot.yml), so a version moves when a person decides
+# it should.
+#
+# To pin or re-pin: take the tag from `envup status` or the install log, or read
+# it off the upstream releases page. It is upstream's spelling, verbatim —
+# ripgrep and delta publish `15.2.0`, everything else `v15.2.0`; construct it
+# from the version number and the download 404s. To unpin: delete the line, and
+# the test will tell you to put it back.
 #
 # module    tag
-fzf         v0.74.2
-zoxide      v0.10.0
 atuin       v18.19.0
+bat         v0.26.1
+delta       0.19.2
+direnv      v2.37.1
+eza         v0.23.5
+fd          v10.4.2
+fzf         v0.74.2
 nvim        v0.12.4
+ripgrep     15.2.0
+zoxide      v0.10.0

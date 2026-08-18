@@ -96,7 +96,7 @@ envup 里没有任何一处会弹 `sudo` 密码提示。它用 `sudo -n true` �
 | `script` | 官方 `curl \| sh` 安装脚本 | 不需要 |
 | `manual` | 打印手动指引，模块标记为 degraded | — |
 
-`github_release` 会按探测到的 OS / arch / libc 匹配 release 资产 —— 包括在 glibc 太旧的机器上自动选 **musl** 构建 —— 并用 `versions.lock` 钉版本，保证多机一致。
+`github_release` 会按探测到的 OS / arch / libc 匹配 release 资产 —— 包括在 glibc 太旧的机器上自动选 **musl** 构建 —— 并用 [`versions.lock`](versions.lock) 钉版本，保证多机一致。凡是能走这条路的模块都在里面有一行，相隔几个月装起来的两台服务器也拿到同一个二进制；要换版本得改文件、提一次 commit，不会某天自己变了。
 
 `zsh`/`git`/`tmux` 需要编译且没有静态发布，无 root 时会是 `degraded`：**配置文件照样落地**，管理员装上包后立即生效，不需要重装。
 

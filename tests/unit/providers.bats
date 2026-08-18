@@ -169,6 +169,60 @@ EOF
     [ -z "$output" ]
 }
 
+# ---- the lockfile this repo actually ships -------------------------------
+#
+# The mechanism above is tested against fixtures; these two check the file. A
+# lockfile is only worth having if it is complete: with six of ten modules
+# pinned, the fleet agrees about most things, and the tools it disagrees about
+# are the ones nobody chose — which is a harder problem than not pinning at all.
+
+_gh_modules() {
+    local m
+    for m in "$REPO_ROOT"/modules/*/meta.sh; do
+        grep -q '^PROVIDERS=.*github_release' "$m" && basename "$(dirname "$m")"
+    done
+}
+
+_lock_modules() {
+    grep -vE '^\s*(#|$)' "$REPO_ROOT/versions.lock" | awk '{print $1}'
+}
+
+@test "every module that installs from a GitHub release is pinned" {
+    local m missing=()
+    while read -r m; do
+        [[ -n "$m" ]] || continue
+        _lock_modules | grep -qx "$m" || missing+=("$m")
+    done < <(_gh_modules)
+    [ "${#missing[@]}" -eq 0 ] || {
+        echo "not in versions.lock: ${missing[*]}"; return 1
+    }
+}
+
+@test "versions.lock pins nothing that no longer exists" {
+    # The other direction: a module gets deleted or switches provider and its
+    # line stays, pinning something to a tag nobody reads.
+    local m stale=()
+    while read -r m; do
+        [[ -n "$m" ]] || continue
+        _gh_modules | grep -qx "$m" || stale+=("$m")
+    done < <(_lock_modules)
+    [ "${#stale[@]}" -eq 0 ] || {
+        echo "pinned but no such github_release module: ${stale[*]}"; return 1
+    }
+}
+
+@test "every pinned tag looks like a tag, not a version number" {
+    # `ripgrep 15.2.0` and `bat v0.26.1` are both right, because that is how
+    # each upstream spells it. What is never right is a bare word or a URL.
+    local line
+    while read -r line; do
+        [[ -n "$line" ]] || continue
+        [[ "$line" =~ ^[a-z0-9_-]+[[:space:]]+v?[0-9]+\.[0-9]+(\.[0-9]+)?[a-z0-9.-]*$ ]] || {
+            echo "malformed lockfile line: $line"; return 1
+        }
+    done < <(grep -vE '^\s*(#|$)' "$REPO_ROOT/versions.lock" | sed 's/#.*//')
+}
+
 # ---- declining routes ----------------------------------------------------
 
 @test "provider_github_release: declines when offline instead of hanging" {

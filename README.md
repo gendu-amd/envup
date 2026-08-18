@@ -157,7 +157,9 @@ that can work here:
 
 `github_release` matches assets against the detected OS / arch / libc — including
 picking a **musl** build on a host whose glibc is too old — and pins versions in
-`versions.lock` so every machine gets the same binary.
+[`versions.lock`](versions.lock) so every machine gets the same binary. Every
+module that can install this way has an entry there, so two servers set up
+months apart agree; moving one of them is a commit, not a surprise.
 
 `zsh`, `git` and `tmux` need a compiler and have no static release to fetch. Without
 root and without the package, they end up `degraded`: **the config files are still
