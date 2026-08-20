@@ -242,6 +242,36 @@ $ envup adopt
 
 它只处理**纯追加**这一种形态；你自己改的内容会被报出来但原样保留。
 
+## 环境变量
+
+全部可选，默认值适用于常见情况。安装时读取。
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `ENVUP_DRY_RUN` | `0` | 为 `1` 时每个有破坏性的步骤只打印会做什么，不真做。`--dry-run` 会自动设上。 |
+| `ENVUP_OFFLINE` | `0` | 为 `1` 时完全不尝试联网：下载步骤立刻放弃而不是等超时，配置照常落地。 |
+| `ENVUP_GH_MIRROR` | — | GitHub 流量走的镜像前缀，如 `https://ghproxy.com`。release、clone、raw 文件都算。只改写 GitHub 自己的域名，厂商自有安装地址原样放行。 |
+| `ENVUP_REQUIRE_CHECKSUM` | `0` | 为 `1` 时，对不上已发布摘要的二进制拒装而不是照装。默认关，因为 fd、bat、delta 等上游根本不发摘要。配合 `ENVUP_GH_MIRROR` 时值得开。 |
+| `ENVUP_LOCAL_BIN` | `~/.local/bin` | 免 root 安装时二进制的落点。 |
+| `ENVUP_LOCAL_OPT` | `~/.local/opt` | 整棵目录树而非单个文件的 release（nvim、fzf）解包到这里，里面的二进制再链到 `ENVUP_LOCAL_BIN`，所以 `PATH` 上只需要那一个目录。 |
+| `ENVUP_BACKUP_DIR` | `~/.dotfiles_backup/<时间戳>` | 链接目标处**已有真实文件**时，先搬到这里再建链。每轮一个目录，里面保留原来的相对路径，既不撞名也看得出文件原来在哪。 |
+| `ENVUP_STATE_DIR` | `~/.local/state/envup` | manifest、日志、adopt 暂存。认 `XDG_STATE_HOME`，但只在这台机器还没在用默认路径时才认。 |
+| `ENVUP_LOG_DIR` | `$ENVUP_STATE_DIR/logs` | 日志文件目录。 |
+| `ENVUP_LOG_FILE` | `ENVUP_LOG_DIR` 下的带时间戳文件 | 指定这一轮日志写到哪；设成 `/dev/null` 就不留日志。一般不用动，每条命令会自己开一个。 |
+| `ENVUP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error`，控制终端详略。日志文件始终记录全量。 |
+| `ENVUP_MODULE_TIMEOUT` | `900` | 每个模块钩子外层的看门狗。卡住的模块会被杀掉并记为失败，整轮继续。 |
+| `ENVUP_NET_TIMEOUT` | `120` | git 操作的单命令超时。`timeout(1)` 不可用时优雅退化（macOS 装 coreutils 可得 `gtimeout`）。 |
+| `ENVUP_NET_TIMEOUT_NVIM` | `600` | `nvim --headless +Lazy!` 的超时——clone 三十多个插件要几分钟。 |
+| `ENVUP_NET_TIMEOUT_INSTALLER` | `300` | `curl ... \| sh` 类安装脚本的超时。 |
+| `ENVUP_NET_KILL_AFTER` | `10` | 网络超时后到 SIGKILL 之间的宽限秒数，防止卡死的连接超出预算。 |
+| `ENVUP_NET_PROBE_TIMEOUT` | `5` | 判定 `direct`/`mirror`/`offline` 那次探测的等待时间。这是**探测**不是下载——该调大的是"半天不应答"的链路，不是"传得慢"的链路。 |
+| `ENVUP_PRIV_KEEP_ENV` | 自动探测 | 提权命令是否走 `sudo -E`。设了代理时 envup 会探测 `sudo -n -E true` 并按结果决定；`1` 强制开，`0` 强制关。sudoers 规则让探测结果失真的机器上值得手动设——关掉且有代理时，`apt-get` 没有出网路径，只会超时死掉。 |
+| `ENVUP_EDITOR` | — | shell 挑 `EDITOR` 时优先尝试的编辑器，排在 `nvim`/`vim`/`vi`/`nano` 之前。这台机器上没装就继续往下找，所以同一个值在所有机器上设都是安全的。 |
+| `ENVUP_PLATFORM` | 自动探测 | 强制平台判定：`macos`/`linux`/`wsl2`/`docker`。探测本身是可靠的，这个变量是为了复现另一台机器的行为。 |
+| `ENVUP_NVIM_LAZY` | `restore` | `restore` 按 `lazy-lock.json` 装钉住的版本；`sync` 更新到最新并重写锁文件；`skip` 留给 nvim 首次启动。 |
+| `ENVUP_ATUIN_INSTALL` | — | 设成 `skip` 跳过 atuin 模块（它的安装器被网络/代理挡住时好用）。 |
+| `ENVUP_ZSH_QUIET` | `0` | shell 侧：为 `1` 时配置切片加载失败静默处理。默认会打印是哪个切片、为什么。 |
+
 ## 核心保证
 
 - **备份而非覆盖**：`safe_link` 会先把目标处的真实文件移到 `~/.dotfiles_backup/<时间戳>/`，并且**保留原来的相对路径**（`~/.config/git/ignore` 存成 `<备份>/.config/git/ignore`）。这样既能从备份本身看出文件原来在哪，两个同名文件也不会互相覆盖。

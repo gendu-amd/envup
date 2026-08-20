@@ -87,10 +87,14 @@ failure aborts the rest of the run.
 
 `lib/caps.sh` probes once and exports the result, so hooks in subshells reuse it:
 
-`ENVUP_OS` · `ENVUP_DISTRO` / `_VER` / `_LIKE` · `ENVUP_ARCH` (normalised, so
+`ENVUP_OS` · `ENVUP_PLATFORM` (the OS *flavour* — `macos`/`linux`/`wsl2`/`docker`;
+ask `ENVUP_OS` for "is this a Mac?", `ENVUP_PLATFORM` for "am I in a container?") ·
+`ENVUP_DISTRO` · `ENVUP_DISTRO_VER` · `ENVUP_DISTRO_LIKE` (the `ID_LIKE` field, so
+a derivative can be treated as its parent) · `ENVUP_ARCH` (normalised, so
 `arm64` and `aarch64` don't produce two answers) · `ENVUP_LIBC` (`glibc-<ver>` or
 `musl`, which decides whether a prebuilt binary will even run) · `ENVUP_PRIV` ·
-`ENVUP_NET` · `ENVUP_HOST` · `ENVUP_HOME_SHARED`.
+`ENVUP_PKG` (which package manager won — `apt`/`dnf`/`yum`/`pacman`/`apk`/`brew`,
+or `unknown` where there is none) · `ENVUP_NET` · `ENVUP_HOST` · `ENVUP_HOME_SHARED`.
 
 Two of these carry most of the weight:
 

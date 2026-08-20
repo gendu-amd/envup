@@ -205,9 +205,12 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
   targets are exactly the ones where it may not start). `tmuxrestore`
   also guards a removal: no zsh slice may start a tmux server. Attaching used to
   happen at login, and it is the kind of convenience that gets re-added by
-  someone who never hit the failure it causes. One file tests no code at all:
+  someone who never hit the failure it causes. Two files test no code at all:
   `release` checks that `VERSION`, `CHANGELOG.md` and `git tag` still agree —
-  see [Releasing](#releasing).
+  see [Releasing](#releasing) — and `knobs` checks that every `ENVUP_*` name in
+  the code is either documented or listed as internal, with the reason. An env
+  var has no signature and no caller to keep it honest, so adding one is
+  invisible; that file makes it fail until someone decides which kind it is.
 - **Scripts under `modules/*/files/bin/`** are first-party sources: `lint.sh`
   covers them, and they get behavioural tests, not grep tests — see
   `tests/unit/sessionizer.bats`, which stubs `tmux` and `fzf` to exercise the

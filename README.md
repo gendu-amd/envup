@@ -431,7 +431,11 @@ envup recognises these env vars at install time. All are optional; defaults are 
 | `ENVUP_GH_MIRROR` | — | Prefix that GitHub traffic is routed through, e.g. `https://ghproxy.com`. Covers releases, clones and raw files. Only GitHub hosts are rewritten — a vendor's own installer URL is left alone, since a GitHub proxy can't serve a host it has never heard of. |
 | `ENVUP_REQUIRE_CHECKSUM` | `0` | When `1`, a release binary that can't be checked against a published digest is refused instead of installed. Off by default because several upstreams (fd, bat, delta) publish no checksums at all. Worth turning on with `ENVUP_GH_MIRROR`. |
 | `ENVUP_LOCAL_BIN` | `~/.local/bin` | Where root-free installs put binaries. |
+| `ENVUP_LOCAL_OPT` | `~/.local/opt` | Where a release that is a whole tree rather than one file (nvim, fzf) is unpacked. The binary inside it is then linked into `ENVUP_LOCAL_BIN`, so only that one directory needs to be on `PATH`. |
+| `ENVUP_BACKUP_DIR` | `~/.dotfiles_backup/<timestamp>` | Where a pre-existing **real** file at a link target is moved before the symlink is created. One directory per run; the path inside it mirrors the original, so nothing collides and you can see where a file came from. |
 | `ENVUP_STATE_DIR` | `~/.local/state/envup` | Manifest, logs and adopt's stash. Honours `XDG_STATE_HOME` — but only on a machine that isn't already using the default path, so setting it later can't make an installed environment look uninstalled. |
+| `ENVUP_LOG_DIR` | `$ENVUP_STATE_DIR/logs` | Where the per-command log files are written. |
+| `ENVUP_LOG_FILE` | a timestamped file in `ENVUP_LOG_DIR` | Set it to send this one run's log somewhere specific; set it to `/dev/null` to keep no log at all. Normally left alone — each command opens its own file. |
 | `ENVUP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` — terminal verbosity. The log file always records everything. |
 | `ENVUP_MODULE_TIMEOUT` | `900` | Outer watchdog around each module hook. A hung module is killed and reported failed; the run continues. |
 | `ENVUP_NVIM_LAZY` | `restore` | `restore` installs the pinned versions from `lazy-lock.json`; `sync` updates to latest and rewrites the lock; `skip` leaves them for nvim's first launch. |
@@ -441,6 +445,10 @@ envup recognises these env vars at install time. All are optional; defaults are 
 | `ENVUP_NET_TIMEOUT_NVIM` | `600` | Larger timeout for `nvim --headless +Lazy!` (cloning 30+ plugins takes minutes). |
 | `ENVUP_NET_TIMEOUT_INSTALLER` | `300` | Timeout for `curl ... \| sh` installers (Oh-My-Zsh, atuin, zoxide). |
 | `ENVUP_NET_KILL_AFTER` | `10` | Grace period (s) after a network timeout before the process is SIGKILLed, so a wedged connection can't hang past the budget. |
+| `ENVUP_NET_PROBE_TIMEOUT` | `5` | How long the one-off reachability probe waits when deciding `direct` / `mirror` / `offline`. This is the probe, not the download — raise it on a link that is slow to *answer*, not on one that is slow to *transfer*. |
+| `ENVUP_PRIV_KEEP_ENV` | probed | Whether privileged commands run as `sudo -E`. Behind a proxy envup probes `sudo -n -E true` and uses the answer; `1` forces it on and `0` off. Worth setting on a machine whose sudoers rules make the probe misleading — with it off and a proxy set, `apt-get` has no route out and dies on a timeout. |
+| `ENVUP_EDITOR` | — | Editor tried first, ahead of `nvim`/`vim`/`vi`/`nano`, when the shell picks `EDITOR`. Falls through to the list if what you name isn't installed here, so the same value is safe to set on every machine. |
+| `ENVUP_PLATFORM` | detected | Forces the platform verdict: `macos`/`linux`/`wsl2`/`docker`. Detection is reliable; this exists to reproduce another machine's behaviour when something looks platform-specific. |
 
 Docker example:
 

@@ -419,6 +419,25 @@ ones you never exercise on the machine you developed on.
   and every other image hid it: alpine is musl, fedora and arch are both newer
   than the runner.
 
+### The env vars that were only in the source
+
+- **Eleven `ENVUP_*` variables are documented for the first time**, including
+  the ones a locked-down machine actually needs: `ENVUP_PRIV_KEEP_ENV` (whether
+  privileged commands keep your proxy through `sudo -E`), `ENVUP_BACKUP_DIR`
+  (where your pre-existing dotfiles are moved before a link replaces them),
+  `ENVUP_LOCAL_OPT`, `ENVUP_LOG_DIR`, `ENVUP_LOG_FILE`, `ENVUP_EDITOR`,
+  `ENVUP_NET_PROBE_TIMEOUT` and `ENVUP_PLATFORM`. The README had a whole section
+  on the backup guarantee without ever saying the destination could be changed.
+- **`README.zh-CN.md` gained the environment-variable table** the English README
+  always had; the two now name exactly the same set, which is itself checked.
+- **`tests/unit/knobs.bats`** makes the gap unrepeatable. Every `ENVUP_*` name in
+  the code must be either documented or listed as internal with a reason, and the
+  test also catches the reverse — a variable renamed in the code while the README
+  keeps advertising the old name, so the user's `export` silently does nothing.
+  An env var is the one part of the interface with no signature and no caller to
+  keep it honest: adding one costs nothing and tells nobody. Ten are declared
+  internal (`ENVUP_RC_*`, manifest paths, the sudo argv, a test hook).
+
 ### Internals
 
 - **`lib/upgrade.sh`** — the `git` half of `cmd_upgrade`, which had been two
