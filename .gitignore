@@ -36,9 +36,9 @@ modules/nvim/files/local.lua
 # is launched from inside the repo, e.g. during development or `bash -n` checks).
 *.nvimlog
 
-# Understand-Anything knowledge graph: commit the graph itself (analyzed
-# baseline, reused by teammates) but never the local scratch dirs.
-.understand-anything/intermediate/
-.understand-anything/tmp/
-.understand-anything/.trash-*/
-.understand-anything/diff-overlay.json
+# Code-analysis tools that keep an index in the working tree. The graph is a
+# snapshot of a codebase at one commit, so committing it means committing
+# something that is wrong the moment anyone lands a change — and silently, since
+# nothing checks it. Keep the whole directory out of the repo and regenerate it
+# locally when you want one.
+.understand-anything/
