@@ -448,6 +448,18 @@ ones you never exercise on the machine you developed on.
 
 ### Fixed
 
+- **`envup install` no longer calls a helper that was deleted.** `pkg_have`
+  was a duplicate of `have`, removed when the library was deduplicated; one
+  caller in the CLI was missed, so every install printed
+  `envup: line 93: pkg_have: command not found` once per module and — because
+  the failed call is the one deciding whether a prerequisite is already
+  present — the answer was always "missing". Every run therefore called the
+  package manager for packages the machine already had, which on a sudo-capable
+  Debian box meant an `apt-get update` and an unasked-for upgrade of `curl`.
+  Nothing checked stderr: the dry-run tests asserted exit codes and symlinks,
+  and this printed on every one of them for two releases. They now fail on
+  `command not found`, `unbound variable` or `syntax error` from any profile,
+  and the read-only commands are held to the same rule.
 - **`.gitconfig` no longer names binaries it cannot guarantee.** `core.editor =
   nvim`, `merge.tool`/`diff.tool = vimdiff` and `interactive.diffFilter = delta`
   were committed unconditionally and read on every machine. On a box without

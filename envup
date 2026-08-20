@@ -90,7 +90,7 @@ EOF
     for m in "${order[@]}"; do
         for d in $(module_meta "$m" SELF_DEPS); do
             [[ -n "$d" ]] || continue
-            pkg_have "$d" || deps+=("$d")
+            have "$d" || deps+=("$d")
         done
     done
     if (( ${#deps[@]} )); then
