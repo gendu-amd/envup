@@ -16,3 +16,5 @@ Session.vim
 
 # nvim's log, if something asks it to write one in the current directory.
 .nvimlog
+
+**/.claude/settings.local.json
