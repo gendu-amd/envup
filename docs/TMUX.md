@@ -144,8 +144,12 @@ tmux source ~/.tmux.conf
 new="$(tmux show -gv @resurrect-dir)"; old=~/.local/share/tmux/resurrect
 mkdir -p "$new"
 cp -n "$old"/tmux_resurrect_*.txt "$old"/pane_contents.tar.gz "$new"/ 2>/dev/null
-ln -sf "$(cd "$new" && ls -t tmux_resurrect_*.txt | head -1)" "$new/last"
+ln -sfn "$(cd "$new" && printf '%s\n' tmux_resurrect_*.txt | sort | tail -1)" "$new/last"
 ```
+
+The newest save is picked by sorting the names rather than by asking `ls`: the
+timestamp is in the filename, so the two orders agree — and envup itself aliases
+`ls` to `eza`, which reads `-t` as "which time field", not "sort by time".
 
 Without that, the next server start restores from an empty directory and looks
 like it lost everything, when the files are one directory over.
