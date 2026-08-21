@@ -177,6 +177,35 @@ changes — every addition is inert until you create the file that uses it.
   reports `openbsd-7.4`) read as old. Override with
   `tmux set-environment -g ENVUP_TS_POPUP 0` / `1`.
 
+### tmux defaults that were wrong in small ways
+
+- **Panes are login shells again.** The config set `default-command zsh`, and
+  tmux runs a `default-command` through `sh -c` — so `/etc/profile`,
+  `/etc/zprofile` and `~/.zprofile` were skipped, and `module`, conda and
+  macOS's `path_helper` were missing from any session started by something other
+  than a login shell of your own: continuum's restore after a reboot, a systemd
+  user unit, `ssh box tmux …`. Started from a terminal you had already logged
+  into, the panes inherited the environment and it never showed. Now
+  `default-shell`, resolved to an absolute path because tmux ignores a bare name
+  and falls back to `/bin/sh`, which tmux starts as a login shell.
+- **`prefix c` opens in the current directory**, as `prefix |` and `prefix -`
+  always have. Without `-c`, a new window uses the directory the *session* was
+  created in: the project root for one the sessionizer made, and wherever you
+  happened to be standing for one you started by hand.
+- **Scrollback 10 000 → 50 000.** tmux-sensible sets 50 000, but only when it
+  finds tmux's own default of 2000 still in place — so the smaller number
+  written here won, and the plugin looked like it had done nothing. A compile
+  goes past 10 000 without trying.
+- **Killing a session moves you to another one** rather than detaching the
+  client (`detach-on-destroy off`). Once `prefix f` means several projects are
+  open at once, closing one of them should no more drop you back to the login
+  shell than closing a browser tab should quit the browser.
+- **A mouse drag copies without leaving copy mode**
+  (`copy-selection-no-clear`). tmux's binding is copy-and-cancel, which throws
+  away the selection along with the mode, so a drag that caught one line too few
+  cost the whole gesture instead of a nudge. The copy still reaches the system
+  clipboard over the OSC 52 route.
+
 ### Three more tools the config was already calling
 
 - **New modules: `eza`, `bat`, `direnv`** — all three in the `standard` profile.

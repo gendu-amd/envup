@@ -8,7 +8,7 @@ written as `prefix` + key.
 | Keys | Does |
 |---|---|
 | `prefix f` | **Jump to a project** — fzf over your project roots, then attach or create a session named after it |
-| `prefix c` | new window |
+| `prefix c` | new window, in the current directory |
 | `prefix ,` | rename window |
 | `prefix 1`…`9` | go to window N (windows start at 1, not 0) |
 | `prefix <` / `prefix >` | move this window left / right; repeatable |
@@ -36,10 +36,16 @@ written as `prefix` + key.
 | `y` | copy and exit — **also reaches the clipboard of your local machine** |
 | `q` | leave copy mode |
 | `/` `?` | search forward / back |
+| drag with the mouse | copy the selection, and **stay** in copy mode |
 
 The copy goes out over OSC 52, so it works on any server without X11
 forwarding or root. It needs one setting in your terminal — see
 [docs/CLIPBOARD.md](CLIPBOARD.md).
+
+A mouse drag deliberately does not end copy mode the way tmux's own binding
+does. Letting go throws away the selection there, so a drag that caught one line
+too few costs you the whole gesture instead of a nudge; here the selection is
+still up and still adjustable, and `q` leaves when you are done.
 
 ## Colours and `TERM`
 
@@ -65,6 +71,28 @@ those, pin the old value for the machine you start tmux on:
 # modules/tmux/files/hosts/<hostname>.conf
 set -g default-terminal "screen-256color"
 ```
+
+## The shell in a pane
+
+Panes run **zsh, as a login shell**, wherever zsh is installed — even on a
+machine where `chsh` could not change your login shell, which on a managed
+server is most of them.
+
+Login shell matters more than it sounds like it does. A pane that is not one
+skips `/etc/profile`, `/etc/zprofile` and `~/.zprofile`, and you never notice
+for as long as you start tmux by hand from a shell that already ran them and the
+panes inherit the result. It shows up the first time something *else* starts the
+server — continuum restoring after a reboot, a systemd user unit, `ssh box tmux
+…` — and then `module`, conda and (on macOS) `path_helper` are missing from a
+session you did not start differently on purpose. envup's own zsh config is
+fine either way: `.zshenv` is read by every zsh.
+
+```bash
+tmux show -g default-shell      # which shell this machine picked
+```
+
+Scrollback is 50000 lines per pane, matching tmux-sensible — one compile or
+benchmark run goes past the old 10000 without trying.
 
 ## Sessions that survive a reboot
 
@@ -181,6 +209,12 @@ tmux set-environment -g ENVUP_TS_POPUP 1    # popup even on an old one
 ```
 
 The same line in `hosts/<hostname>.conf` makes it permanent for that machine.
+
+Killing a session (`prefix &` on its last window, or `tmux kill-session`) moves
+you to another one rather than detaching you. Once several projects are open at
+once, closing one of them should no more drop you back to the login shell than
+closing a browser tab should quit the browser. With nothing left to switch to it
+detaches, as before.
 
 ### Telling it where your projects are
 

@@ -70,3 +70,76 @@ EOF
     # probe and undo all of the above.
     ! grep -Eq '^[[:space:]]*set(-option)? .*default-terminal' "$(TMUX_CONF)"
 }
+
+# ---- default-shell -------------------------------------------------------
+
+# The shell command out of the `run-shell '<this>'` line that picks the shell.
+conf_shell_probe() {
+    sed -n "/^run-shell 'command -v zsh/s/^run-shell '\(.*\)'\$/\1/p" "$(TMUX_CONF)"
+}
+
+@test "the shell is probed, not assumed" {
+    local cmd; cmd="$(conf_shell_probe)"
+    [ -n "$cmd" ]
+}
+
+@test "a machine with zsh gets zsh, by absolute path" {
+    # tmux ignores a default-shell that is not a full path and quietly uses
+    # /bin/sh instead, so passing the bare name through would give every pane a
+    # posix shell on exactly the machines this line exists for.
+    mkdir -p "$TEST_TMP/zbin"
+    printf '#!/bin/sh\n' > "$TEST_TMP/zbin/zsh"; chmod +x "$TEST_TMP/zbin/zsh"
+    stub_bin tmux <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*"
+EOF
+    PATH="$TEST_TMP/zbin:$PATH" run sh -c "$(conf_shell_probe)"
+    [ "$status" -eq 0 ]
+    [ "$output" = "set -g default-shell $TEST_TMP/zbin/zsh" ]
+}
+
+@test "a machine without zsh is left alone" {
+    # Nothing set at all, so tmux keeps starting the login shell. Pointing the
+    # option at a zsh that is not there would leave the server unable to open a
+    # pane, which is a worse answer than bash.
+    stub_bin tmux <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*"
+EOF
+    isolate_path
+    run sh -c "$(conf_shell_probe)"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "the shell option is never set unconditionally, and never as a command" {
+    # default-command is the one that looks like a synonym and is not: tmux runs
+    # it through `sh -c`, so setting it here would silently take away the login
+    # shell — no /etc/profile, no ~/.zprofile, no `module`, no conda.
+    ! grep -Eq '^[[:space:]]*set(-option)? .*default-(shell|command)' "$(TMUX_CONF)"
+}
+
+# ---- the rest of the file ------------------------------------------------
+
+@test "every way of opening somewhere to type starts in the current directory" {
+    # Splits have taken -c since they were written and `c` did not, so a new
+    # window opened from a session started by hand landed back in $HOME. One
+    # key out of three behaving differently is the kind of thing you stop
+    # noticing and start working around.
+    local k line
+    for k in '|' '-' 'c'; do
+        line="$(grep -F "bind $k " "$(TMUX_CONF)")"
+        [ -n "$line" ]
+        [[ "$line" == *'-c "#{pane_current_path}"'* ]]
+    done
+}
+
+@test "the scrollback limit is not quietly lower than the plugin's" {
+    # tmux-sensible raises history-limit to 50000 — but only when it finds
+    # tmux's default of 2000 still in place. Any number here wins over it,
+    # including a smaller one, and the plugin then looks like it did nothing.
+    local n
+    n="$(sed -n 's/^set -g history-limit \([0-9]*\).*/\1/p' "$(TMUX_CONF)")"
+    [ -n "$n" ]
+    [ "$n" -ge 50000 ]
+}
