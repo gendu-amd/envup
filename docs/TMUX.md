@@ -117,11 +117,47 @@ Three pieces, and all three have to be there:
 layout an unplanned reboot can cost you. Nothing is saved on shutdown, because a
 machine going down does not stop to ask.
 
-**Saves are per machine:** `~/.local/share/tmux/resurrect/<hostname>/`. On a home
-directory shared over NFS the default single directory means every machine writes
-the same file and the last save wins — you log into the build box and it hands
-you the layout you left on the GPU box. Not `/tmp` either way, so a reboot does
-not take them, and envup's `clean` never touches them.
+**Saves are per machine:** `~/.local/share/tmux/resurrect/<hostname>/`, under
+`$XDG_DATA_HOME` if you set one. On a home directory shared over NFS the default
+single directory means every machine writes the same file and the last save wins
+— you log into the build box and it hands you the layout you left on the GPU
+box. Not `/tmp` either way, so a reboot does not take them, and envup's `clean`
+never touches them.
+
+The name is the **short** hostname, the same one `~/.tmux/host.conf` is keyed by,
+so a machine is called one thing everywhere in envup. Ask rather than assume:
+
+```bash
+tmux show -gv @resurrect-dir
+```
+
+### If you have saves from an earlier envup
+
+The directory moved — twice, and the second time was a bug fix rather than a
+rename. Nothing migrates your saves for you.
+
+A **running** tmux server keeps whatever config it read at start, so it is still
+writing to the old place until you reload:
+
+```bash
+tmux source ~/.tmux.conf
+new="$(tmux show -gv @resurrect-dir)"; old=~/.local/share/tmux/resurrect
+mkdir -p "$new"
+cp -n "$old"/tmux_resurrect_*.txt "$old"/pane_contents.tar.gz "$new"/ 2>/dev/null
+ln -sf "$(cd "$new" && ls -t tmux_resurrect_*.txt | head -1)" "$new/last"
+```
+
+Without that, the next server start restores from an empty directory and looks
+like it lost everything, when the files are one directory over.
+
+**A directory literally named `\` in your home directory** is the bug that fix
+was for: `@resurrect-dir` used to hold `$HOME/.../$HOSTNAME` as a string for
+tmux-resurrect to expand later, and on some tmux versions the value came back
+from tmux with the `$` escaped — so the expansion left the backslash behind and
+built a whole tree under it. Everything in there is a save that went to the
+wrong place. Copy the newest one out if you want it, then delete the tree; once
+`tmux show -gv @resurrect-dir` prints a path with no backslash in it, nothing
+writes there again.
 
 ### Coming back: type `tm`, not `tmux`
 

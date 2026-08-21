@@ -56,56 +56,81 @@ saved_layout() {   # pretend resurrect has something to restore
 
 # ---- where the saves go --------------------------------------------------
 
+# The @resurrect-dir a real tmux is left holding once it has read the config.
+# What the file says is only the input: the value goes through tmux's parser on
+# the way in and tmux-resurrect's sed on the way out, and the bug these guard
+# lived in the gap between the two. So ask the server, not the file.
+conf_resurrect_dir() {   # <what `hostname` prints> [socket tag]
+    export TMUX_TMPDIR="$TEST_TMP"        # sockets under the test dir, not /tmp
+    rm -f "$STUB_BIN/tmux"                # the real tmux, not setup()'s recorder
+    stub_bin hostname <<EOF
+#!/bin/bash
+printf '%s\n' '$1'
+EOF
+    local sock="envup-rd-$$-${2:-a}"
+    # A session, not just start-server: tmux before 3.0 shuts a server back down
+    # the moment it is left with none.
+    tmux -L "$sock" -f "$(TMUX_CONF)" new-session -d 2>/dev/null || return 1
+    tmux -L "$sock" show-option -gqv @resurrect-dir
+    tmux -L "$sock" kill-server 2>/dev/null || true
+}
+
 @test "the resurrect store is keyed by machine, not shared across them" {
     # A home directory on NFS means every machine writes the same save file and
     # the last one to save wins: you log into the build box and get the layout
-    # you left on the GPU box. This is the line that prevents it.
-    grep -q '@resurrect-dir.*\$HOSTNAME' "$(TMUX_CONF)"
-}
-
-@test "the \$HOSTNAME in @resurrect-dir survives tmux's parser" {
-    # In double quotes tmux expands variables itself, and $HOSTNAME is not in
-    # the server's environment — the option would come out as a bare directory
-    # and every machine would share it again. Single quotes are load-bearing.
-    grep -q "@resurrect-dir '" "$(TMUX_CONF)"
-
+    # you left on the GPU box.
     command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
-    rm -f "$STUB_BIN/tmux"            # the real tmux, not this file's stub
-    # One command list: tmux before 3.0 shuts the server down again the moment
-    # `start-server` leaves it with no sessions.
-    local sock="envup-rd-$$"
-    run tmux -L "$sock" -f "$(TMUX_CONF)" start-server \; show -gv @resurrect-dir \; kill-server
-    tmux -L "$sock" kill-server 2>/dev/null || true
-    [[ "$output" == *'$HOSTNAME'* ]]
-}
-
-@test "two machines sharing a home get two different save directories" {
-    # The end-to-end version of the two above, run through resurrect's own
-    # expansion rather than a copy of it here.
-    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
-    rm -f "$STUB_BIN/tmux"
-    export TMUX_TMPDIR="$TEST_TMP"    # so helpers.sh's bare `tmux` finds ours
-
-    local rs="$REPO_ROOT/modules/tmux/files/plugins/tmux-resurrect"
-    [ -r "$rs/scripts/helpers.sh" ] || skip "tmux-resurrect submodule not checked out"
-
-    # A session, not just start-server: older tmux exits a sessionless server
-    # immediately, and helpers.sh has to be able to ask it for the option.
-    tmux -f "$(TMUX_CONF)" new-session -d -s probe 2>/dev/null ||
-        skip "cannot start a tmux server here"
-
     local a b
-    stub_bin hostname <<<'#!/bin/bash
-echo boxA'
-    a="$(bash -c 'source "$1" >/dev/null 2>&1; resurrect_dir' _ "$rs/scripts/helpers.sh")"
-    stub_bin hostname <<<'#!/bin/bash
-echo boxB'
-    b="$(bash -c 'source "$1" >/dev/null 2>&1; resurrect_dir' _ "$rs/scripts/helpers.sh")"
-    tmux kill-server 2>/dev/null || true
-
+    a="$(conf_resurrect_dir boxA a)" || skip "cannot start a tmux server here"
+    b="$(conf_resurrect_dir boxB b)"
     [ "$a" != "$b" ]
-    [[ "$a" == *boxA ]]
-    [[ "$b" == *boxB ]]
+    [[ "$a" == */boxA ]]
+    [[ "$b" == */boxB ]]
+}
+
+@test "the save directory is handed over already expanded" {
+    # The regression. The option used to hold the literal string
+    # '$HOME/.local/share/tmux/resurrect/$HOSTNAME' and leave the expanding to
+    # resurrect's sed at save time. On one tmux the value came back from that
+    # round trip as '\$HOME/...\$HOSTNAME'; sed rewrote the $HOME inside it and
+    # left the backslash, so every save went to a directory literally named '\'
+    # in the home directory — while the restore kept reading the real path and
+    # finding a month-old layout. Nothing there is reachable once the value
+    # arrives with nothing left to expand.
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    local dir; dir="$(conf_resurrect_dir boxA)" || skip "cannot start a tmux server here"
+    [ -n "$dir" ]
+    [[ "$dir" == /*    ]]
+    [[ "$dir" != *'$'* ]]
+    [[ "$dir" != *'~'* ]]
+    [[ "$dir" != *'\'* ]]
+}
+
+@test "the config never hands resurrect a path to expand" {
+    # The shape that caused it, and the one a future edit would reach for: a
+    # literal value written in the file. It only has to be mishandled by one of
+    # the two passes it then goes through.
+    ! grep -Eq "^[[:space:]]*set(-option)? .*@resurrect-dir" "$(TMUX_CONF)"
+}
+
+@test "a domain machine is keyed by its short name, like every other envup file" {
+    # $HOSTNAME is the FQDN on a domain-joined box, while $ENVUP_HOST — which
+    # decides whose hosts/<name>.conf gets linked to ~/.tmux/host.conf — is the
+    # short name. One machine under two names is how the save directory ends up
+    # somewhere nothing else in envup agrees with.
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    local dir; dir="$(conf_resurrect_dir box.corp.example.com)" ||
+        skip "cannot start a tmux server here"
+    [[ "$dir" == */box ]]
+    grep -q 'ENVUP_HOST%%\.\*' "$REPO_ROOT/lib/caps.sh"
+}
+
+@test "with no hostname to be had the plugin's own default is left alone" {
+    # An unkeyed directory shared between machines costs you the split; a real
+    # directory named "" costs you the saves. Prefer the first.
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    local dir; dir="$(conf_resurrect_dir '')" || skip "cannot start a tmux server here"
+    [ -z "$dir" ]
 }
 
 @test "an unplanned reboot costs at most five minutes of layout" {

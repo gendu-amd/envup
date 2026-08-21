@@ -70,10 +70,12 @@ changes — every addition is inert until you create the file that uses it.
   machine? One line in `~/.zshrc.d/hosts/<machine>.zsh`, with the guards you
   choose: `[[ -o interactive && -z "$TMUX" && -t 0 ]] && tmux-resume`.
 - **One resurrect save directory per machine**
-  (`~/.local/share/tmux/resurrect/$HOSTNAME`). The default is a single shared
-  path, which on a home directory mounted over NFS means every machine writes
-  the same file and the last save wins — you log into the build box and it
-  restores the layout you left on the GPU box.
+  (`~/.local/share/tmux/resurrect/<short-hostname>`, under `$XDG_DATA_HOME` if
+  you set one). The default is a single shared path, which on a home directory
+  mounted over NFS means every machine writes the same file and the last save
+  wins — you log into the build box and it restores the layout you left on the
+  GPU box. The name is the same short hostname `~/.tmux/host.conf` is keyed by,
+  so one machine answers to one name everywhere in envup.
 - **`@continuum-save-interval` 15 → 5**, so an unplanned reboot costs at most
   five minutes of window shuffling.
 - **`@resurrect-strategy-nvim 'session'` finally does something.** The strategy
@@ -87,6 +89,31 @@ changes — every addition is inert until you create the file that uses it.
 - New global gitignore at `~/.config/git/ignore` (a path git reads on its own,
   no `core.excludesFile` to get wrong) covering `Session.vim` and `.nvimlog`,
   for the crash that leaves one behind in a repository.
+
+### Fixed: resurrect saves could go to a directory named `\`
+
+If you have run an earlier build of this branch, look for a directory literally
+named `\` in your home directory before you upgrade — and read the migration
+steps in [docs/TMUX.md](docs/TMUX.md) rather than just deleting it.
+
+- `@resurrect-dir` held the literal string
+  `$HOME/.local/share/tmux/resurrect/$HOSTNAME` and left the expanding to
+  tmux-resurrect, which does it with `sed` at save time. That value has to
+  survive tmux's own quoting on the way through, and on at least one tmux it did
+  not: it came back as `\$HOME/...\$HOSTNAME`, `sed` rewrote the `$HOME` inside
+  it and left the backslash, and saves went to
+  `~/\/home/<you>/.local/share/tmux/resurrect/\<host>/` from then on. Restores
+  kept reading the real path and finding whatever was last written there before
+  the drift began — which is the worst shape this kind of bug can take, because
+  for weeks it looks like it is working.
+- The config now expands the path itself and hands the option a finished
+  absolute path, so the second pass has nothing left to mangle. The tests were
+  wrong in the same way the config was: they grepped the file, which was never
+  the half that failed. They now start a real tmux, read the option back off the
+  server, and assert no `$`, `~` or `\` survives into it.
+- The directory name also changes from the FQDN to the short hostname, so
+  machines where this *was* working get a new (empty) directory too. Same
+  migration either way.
 
 ### Three tools the rest of the config assumed
 
