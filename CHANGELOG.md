@@ -98,11 +98,13 @@ steps in [docs/TMUX.md](docs/TMUX.md) rather than just deleting it.
 
 - `@resurrect-dir` held the literal string
   `$HOME/.local/share/tmux/resurrect/$HOSTNAME` and left the expanding to
-  tmux-resurrect, which does it with `sed` at save time. That value has to
-  survive tmux's own quoting on the way through, and on at least one tmux it did
-  not: it came back as `\$HOME/...\$HOSTNAME`, `sed` rewrote the `$HOME` inside
-  it and left the backslash, and saves went to
-  `~/\/home/<you>/.local/share/tmux/resurrect/\<host>/` from then on. Restores
+  tmux-resurrect, which does it with `sed` at save time. That value has to cross
+  two parsers to get there, and on at least one machine it came out of the
+  second one with a backslash in front of each `$` — `\$HOME/...\$HOSTNAME`.
+  `sed` then rewrote the `$HOME` *inside* that and left the backslash standing,
+  so saves went to `~/\/home/<you>/.local/share/tmux/resurrect/\<host>/` from
+  then on. Which layer added the backslash is still open: neither tmux 2.7 nor
+  3.7c reproduces it from this line, with either quoting. Restores
   kept reading the real path and finding whatever was last written there before
   the drift began — which is the worst shape this kind of bug can take, because
   for weeks it looks like it is working.

@@ -152,12 +152,25 @@ like it lost everything, when the files are one directory over.
 
 **A directory literally named `\` in your home directory** is the bug that fix
 was for: `@resurrect-dir` used to hold `$HOME/.../$HOSTNAME` as a string for
-tmux-resurrect to expand later, and on some tmux versions the value came back
-from tmux with the `$` escaped — so the expansion left the backslash behind and
-built a whole tree under it. Everything in there is a save that went to the
-wrong place. Copy the newest one out if you want it, then delete the tree; once
+tmux-resurrect to expand later, and on at least one machine the value came back
+out of the server with a backslash in front of each `$` — so the expansion
+rewrote the `$HOME` inside it, left the backslash standing, and built a whole
+tree under it. Everything in there is a save that went to the wrong place. Copy
+the newest one out if you want it, then delete the tree; once
 `tmux show -gv @resurrect-dir` prints a path with no backslash in it, nothing
 writes there again.
+
+Which layer put the backslash there is not yet known — tmux 2.7 and 3.7c both
+hand the old line back unescaped. If you still have that server running on its
+old config, it is holding the evidence in memory, and it is gone the moment you
+reload:
+
+```bash
+tmux -V; tmux show-option -gqv @resurrect-dir | cat -A
+```
+
+The fix does not depend on the answer: it removes the round trip rather than the
+escape, so there is nothing left for either parser to get wrong.
 
 ### Coming back: type `tm`, not `tmux`
 
