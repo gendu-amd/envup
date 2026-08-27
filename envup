@@ -210,7 +210,10 @@ EOF
     fi
     [[ $dry == 1 ]] && fwd+=(--dry-run)
 
-    cmd_install "${fwd[@]}" "${inst[@]}"; local rc=$?
+    # fwd is empty for a plain `envup upgrade`, and bash before 4.4 treats
+    # expanding an empty array under `set -u` as an unbound variable. The
+    # ${a[@]+...} form is how the rest of the codebase says "expand to nothing".
+    cmd_install "${fwd[@]+"${fwd[@]}"}" "${inst[@]}"; local rc=$?
     if (( ok == 0 )); then echo; log_error "REMINDER: the source was NOT updated — this reinstalled the OLD source"; return 1; fi
     return $rc
 }

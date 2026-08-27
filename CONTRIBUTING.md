@@ -139,6 +139,13 @@ no change to `envup` or `lib/` is needed.
   user data.
 - Nothing may block on input. No `sudo` prompt, no `read`. If a privilege isn't
   available without a password, take another route or degrade.
+- **Write `"${a[@]+"${a[@]}"}"`, not `"${a[@]}"`, wherever the array can be
+  empty.** bash before 4.4 — RHEL/CentOS 7, Ubuntu 16.04, all inside the
+  declared floor of 4.0 — treats expanding an empty array under `set -u` as an
+  unbound variable. `(( ${#a[@]} ))` is fine on those versions and is the other
+  accepted form; it is only the expansion that breaks. Nothing in local
+  development will tell you, so run `tests/integration/oldbash.sh` in a
+  `centos:7` container (CI does).
 - `envup doctor --authoring` must pass. It catches leftover v1 `install.sh`
   files, hand-rolled downloads, unknown providers, executable statements in
   `meta.sh`, `CLEAN_PATHS` that would delete user data, two modules claiming the
@@ -218,10 +225,15 @@ Requirements: [`shellcheck`](https://www.shellcheck.net/) and
 - **Integration** (`tests/integration/`): `dry-run.bats` asserts every profile
   installs side-effect free; `doctor.bats` validates the authoring rules against
   fixture modules; `smoke.sh` does a real install→status→uninstall of the `git`
-  module in a throwaway `HOME`.
-- CI additionally runs the two environments that used to break: an
+  module in a throwaway `HOME`; `oldbash.sh` runs the read-only and dry-run
+  commands and fails on any shell diagnostic in their output, which is the only
+  way a bash-version incompatibility is visible — it goes to stderr and usually
+  leaves the exit code alone.
+- CI additionally runs the three environments that used to break: an
   **unprivileged container** (must install via `github_release` and degrade, not
-  fail) and an **offline** run (must decline immediately, not hang).
+  fail), an **offline** run (must decline immediately, not hang), and
+  **bash 4.2** via `centos:7` (the floor `envup` declares; every other job runs
+  bash 5, which is how the empty-array expansion in `upgrade` survived).
 - Any behavior change must keep the core invariants intact (backup / idempotent
   / reversible / dry-run / dependency order / single source of truth / never
   block on input) — the unit suite guards them.

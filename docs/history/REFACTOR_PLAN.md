@@ -4,7 +4,7 @@
 > 代码布局。计划已执行完毕（结项见 [`REFACTOR_REPORT.md`](./REFACTOR_REPORT.md)），
 > 其中若干路径在 v0.2 的模块契约 v2 里已经不存在——`modules/*/install.sh` 变成了
 > `modules/*/hooks.sh`，`.zshrc.d/platform.zsh` 变成了编号切片 `20-platform.zsh`。
-> 想了解当前架构请看 [`ARCHITECTURE.md`](./ARCHITECTURE.md)；本文保留是为了记录当时
+> 想了解当前架构请看 [`ARCHITECTURE.md`](../ARCHITECTURE.md)；本文保留是为了记录当时
 > 的判断依据。
 >
 > 配套文件：[`docs/REFACTOR_BASELINE.md`](./REFACTOR_BASELINE.md)（冻结的问题清单，最终对照用）。

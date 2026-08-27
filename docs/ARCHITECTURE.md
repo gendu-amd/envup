@@ -152,6 +152,14 @@ the choke point stays a choke point.
   `timeout`'s own 124/137/143.
 - **Dry-run is total.** `ENVUP_DRY_RUN=1` / `--dry-run` previews every change,
   including inside providers.
+- **bash 4.0 is a floor that is tested, not just declared.** The oldest servers
+  this targets — RHEL/CentOS 7, Ubuntu 16.04 — ship bash 4.2, and the one
+  incompatibility that matters is invisible on anything newer: before 4.4,
+  expanding an empty array under `set -u` is an *error*
+  (`a[@]: unbound variable`), so every `"${a[@]}"` whose array can be empty has
+  to be written `"${a[@]+"${a[@]}"}"`. It goes to stderr and often leaves the
+  exit code alone, which is why `tests/integration/oldbash.sh` asserts on the
+  output rather than the status, and why CI runs it in a `centos:7` container.
 
 ## Observability
 

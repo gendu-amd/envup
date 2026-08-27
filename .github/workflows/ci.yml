@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main, refactor]
+    # 'refactor/**', not 'refactor': a bare name matches that branch and nothing
+    # under it, so every push to refactor/v0.2 ran no CI at all — which is how a
+    # smoke test left asserting the schema-1 manifest layout stayed red, unseen,
+    # for the length of a release cycle.
+    branches: [main, 'refactor/**']
   pull_request:
 
 # Third-party actions are pinned to a commit SHA, with the version in a comment.
@@ -110,6 +114,21 @@ jobs:
           # message; 'Cloning into' would be git having actually gone out.
           grep -rq 'offline:'     "$HOME/.local/state/envup/logs/"
           ! grep -rq 'Cloning into' "$HOME/.local/state/envup/logs/"
+
+  old-bash:
+    name: bash 4.2 (the declared floor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # envup requires bash >= 4 and every other job here runs bash 5, so the
+      # versions between the floor and the tested floor were never exercised.
+      # centos:7 is bash 4.2.46 — the oldest bash envup claims to accept, and
+      # the one on the RHEL 7 servers this is aimed at. --network none because
+      # the image's repos are EOL and nothing here needs to fetch anything.
+      - name: Read-only and dry-run commands on bash 4.2
+        run: |
+          docker run --rm -v "$PWD:/src:ro" --network none centos:7 \
+            bash -c 'cp -r /src /work && cd /work && tests/integration/oldbash.sh'
 
   smoke-host:
     name: smoke (${{ matrix.os }})

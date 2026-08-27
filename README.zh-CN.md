@@ -50,6 +50,47 @@ cd envup
 exec zsh
 ```
 
+## 跑起来是什么样
+
+一台你只有账号、别的什么都没有的服务器：
+
+```console
+$ ./envup install --profile standard
+[i] install order: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv
+==> [zsh] install
+✓ linked: ~/.zshrc
+...
+==> [zoxide] install
+[i] [zoxide] release v0.9.6: zoxide-x86_64-unknown-linux-musl.tar.gz
+✓ [zoxide] zoxide v0.9.6 installed to ~/.local/bin
+
+✓ ok:       zsh git fzf ripgrep fd bat eza zoxide atuin delta direnv
+⚠ degraded: tmux (usable but incomplete — see above)
+
+$ ./envup status
+[i] Platform: linux (x86_64)  PkgMgr: apt  Priv: none
+Modules:
+  ✓ zsh      Modern shell with Oh-My-Zsh + Powerlevel10k theme
+  ✓ git      Git config (~/.gitconfig with delta as pager)
+  ~ tmux     Terminal multiplexer with TPM + session restore  — tmux not found
+  ○ nvim     Neovim editor with NvChad config + lazy.nvim plugins
+  ✓ ok   ~ degraded (config linked, tool missing)   ! broken   ○ not installed
+
+$ ./envup doctor
+==> environment
+[i] os=linux distro=ubuntu-24.04 arch=x86_64 libc=glibc-2.39 priv=none pkg=apt net=direct
+==> modules
+✓ [zsh] ok (5.9)
+⚠ [tmux] degraded: tmux not found
+  → the config is linked — it starts working the moment the tool exists
+✓ doctor: this machine is healthy (1 note(s) above)
+
+$ ./envup status --json | jq '.modules[] | select(.state != "absent") | {name, state, provider}'
+{ "name": "zoxide", "state": "ok", "provider": "github_release" }
+```
+
+注意 `tmux` 那行：没有 root、也没有静态发布可下，所以工具本身没装上 —— 但配置已经链好了，整轮安装的退出码是 0。这是设计出来的结果，不是失败。
+
 ## 命令
 
 ```bash
@@ -175,7 +216,24 @@ LINKS=()
 CLEAN_PATHS=()
 ```
 
-新增模块的完整说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+加一个新工具 = 新建一个目录，没有注册表要改、没有配置要同步。完整说明见
+[CONTRIBUTING.md](CONTRIBUTING.md)。
+
+| 模块 | 工具 | 依赖 |
+|---|---|---|
+| `zsh` | Oh-My-Zsh + Powerlevel10k 的现代 shell（同时把 zsh 设成你的默认 shell）| — |
+| `git` | git 配置（有 delta 时用它做 pager）| — |
+| `delta` | 带语法高亮的 git diff，装好即接到 git 上 | `git` |
+| `tmux` | 终端复用（新 pane 用 zsh、`prefix f` 切项目、OSC 52 剪贴板、重启后恢复现场）| — |
+| `fzf` | 模糊查找（Ctrl+T / Ctrl+R）| — |
+| `ripgrep` | 快速递归搜索（`rg`），也是 Telescope 的后端 | — |
+| `fd` | 更好用的 `find`，也是 fzf 列文件用的 | — |
+| `bat` | 带高亮的 `cat`，`cat` 和 fzf 预览都走它 | — |
+| `eza` | 现代 `ls` —— `ls`/`ll`/`la`/`tree` 都变成它 | — |
+| `direnv` | 按目录的环境变量，`cd` 时从 `.envrc` 载入 | `zsh` |
+| `zoxide` | 更聪明的 `cd` —— `z <目录>` 直接跳，`zi` 交互选 | `zsh` |
+| `atuin` | SQLite 存储的 shell 历史 | `zsh` |
+| `nvim` | Neovim + NvChad（插件版本由 lazy-lock.json 钉住）| — |
 
 ### 在远端机器上干活
 
@@ -186,6 +244,86 @@ tmux 模块里有三件事只在 SSH 场景下才有意义：
 **复制的东西落到你自己的电脑上。** 在 nvim 里 yank、或在 tmux 里复制，文字会经由你已经建好的那条 SSH 连接，进到你面前这台机器的剪贴板 —— 不需要 X11 转发、不需要 root、不需要额外的守护进程。但它需要你**本地终端**上的一个开关，这个 envup 管不到：见 [docs/CLIPBOARD.md](docs/CLIPBOARD.md)。（VS Code 和 Cursor 默认是关的。）
 
 **`prefix f` 切项目。** fzf 列出你的项目目录，选中后连上（或新建）一个以项目命名的 tmux session —— 所以选一个已经开着的项目是回到它，而不是再开一份。tmux ≥ 3.2 会在当前 pane 上开一个 popup，更老的版本退回临时窗口 —— 按键时自己问，不用配。shell 里也可以用 `ts`。默认扫 `~/work/*`、`~/src/*`、`~/projects/*`、`~/dev/*`、`~/repos/*`、`~/go/src/*/*`，要改就在 `~/.config/envup/project-dirs` 里一行一个写自己的。见 [docs/TMUX.md](docs/TMUX.md)。
+
+### 默认 shell
+
+`zsh` 模块从三个方向保证你真的落在 zsh 里：
+
+1. `chsh` 改登录 shell（下次登录生效）。
+2. `chsh` 被禁的账号上（LDAP/SSSD 管理的公司/HPC 机器），往 `~/.bashrc` 里加一小段
+   带守卫的代码，交互式 bash 会 `exec` 进 zsh。逃生口：`NO_ZSH=1 bash`。
+3. `tmux` 模块把 `default-shell` 指向 zsh，所以不管系统登录 shell 是什么，新 pane
+   都是 zsh。（是 `default-shell` 不是 `default-command`：前者 tmux 会当**登录
+   shell** 跑，这样 `module load`、conda、macOS 的 `path_helper` 在"不是你的终端
+   拉起来的" pane 里才还有效。）
+
+`envup uninstall zsh` 会删掉 `~/.bashrc` 里那段（`chsh` 的设置不动）。如果这个
+`~/.bashrc` 本来就是 envup 建的 —— 一个原本没有它的 home —— 而且删完就空了，文件
+本身也一并收回。你原本就有的、或者你后来往里写过东西的，留着。
+
+### nvim 模块
+
+`nvim` 模块把 NvChad 配置链到 `~/.config/nvim` 并装插件。NvChad 需要
+**nvim >= 0.10**，而发行版自带的往往更老 —— Debian stable 和 RHEL 都是。envup 自己
+处理：引擎发现版本不够，就继续往下走 provider 链，改装官方 release 到
+`~/.local/bin`。envup 从不动你的系统软件源。
+
+连这条路也走不通时（没网、架构冷门），模块降级并打印你的选项：
+
+```bash
+brew install neovim                          # macOS
+conda install -c conda-forge neovim          # 老 glibc 系统（RHEL/CentOS 8 …）
+# 或从源码构建：https://github.com/neovim/neovim/blob/master/BUILD.md
+```
+
+**插件是可复现的。** 插件集由提交进仓库的 `lazy-lock.json` 钉住，并验证过在
+nvim 0.10（老 glibc 机器）和 0.11（容器）上都能加载。`envup install nvim` 是**还原**
+到锁文件里的那些版本，所以每台机器拿到的是同一个编辑器。用 `ENVUP_NVIM_LAZY` 控制：
+
+- `restore`（默认）—— 按 `lazy-lock.json` 装钉住的版本。
+- `sync` —— 在版本约束内更新到最新**并重写锁文件**；之后把新的 `lazy-lock.json`
+  提交上去，就能推给所有机器。
+- `skip` —— 留给 nvim 第一次交互启动时自己装。
+
+`./envup clean nvim` 清掉插件/缓存状态，下次安装会从锁文件还原。
+
+**在服务器上编辑。** 三个默认值是照着服务器的真实用法选的，都可以调：
+
+- undo 跨会话保留（`undofile`）。掉线会一起杀掉 shell 和 nvim，没有这个的话上次
+  保存之后的东西全没。
+- 超过 1.5 MB 的缓冲区打开时关掉语法高亮、treesitter、LSP、折叠、undo 和 swap，
+  并告诉你它这么做了。tail 一个 200 MB 的日志不再等于终端被杀。
+  `vim.g.envup_bigfile_bytes = 0` 关掉这个行为。
+- 保存时格式化**只在项目自带风格配置时**才跑（`.clang-format`、`stylua.toml`、
+  `pyproject.toml` …），因为没有 `.clang-format` 的 clang-format 会把整个文件重排成
+  LLVM 风格 —— 在别人的仓库里，那个 diff 得你自己解释。`<leader>fm` 随时手动格式化；
+  `vim.g.envup_format_always = true` 让它无条件跑。
+
+## 它是怎么工作的
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  ./envup install --profile standard                           │
+│         ↓                                                     │
+│  探测能力：OS、发行版、arch、libc、权限、网络                 │
+│         ↓                                                     │
+│  载入 profiles/standard.sh → MODULES=(zsh git ...)            │
+│         ↓                                                     │
+│  按 DEPENDS 解析安装顺序                                      │
+│         ↓                                                     │
+│  对每个模块，引擎：                                           │
+│    读 meta.sh（纯数据）                                       │
+│    按探测到的能力，沿 PROVIDERS 走到第一个可行的             │
+│    把 LINKS 软链进 ~/（已有真实文件先备份）                   │
+│    跑 hooks.sh 里的 post_install（如果有）                    │
+│    验证 VERIFY_BIN / VERIFY_MIN_VERSION                       │
+│    把 名字+状态+provider+版本 记进 manifest                   │
+│         ↓                                                     │
+│  逐模块给出 ok / degraded / skipped / failed 和原因           │
+│         ↓                                                     │
+│  日志写到 ~/.local/state/envup/logs/install_<时间戳>.log      │
+└───────────────────────────────────────────────────────────────┘
+```
 
 ## 配置同步
 
@@ -272,6 +410,23 @@ $ envup adopt
 | `ENVUP_ATUIN_INSTALL` | — | 设成 `skip` 跳过 atuin 模块（它的安装器被网络/代理挡住时好用）。 |
 | `ENVUP_ZSH_QUIET` | `0` | shell 侧：为 `1` 时配置切片加载失败静默处理。默认会打印是哪个切片、为什么。 |
 
+Docker 里试一下：
+
+```bash
+docker run -it --rm ubuntu:24.04 bash -c '
+    apt-get update && apt-get install -y git ca-certificates &&
+    git clone --recursive https://github.com/gendu-amd/envup.git /opt/envup &&
+    /opt/envup/envup install --profile standard
+'
+```
+
+### 你原本就有的 dotfiles
+
+如果软链目标处已经是一个**真实文件**（比如你自己手写的 `~/.zshrc`），envup **一定会
+先备份**到 `~/.dotfiles_backup/<时间戳>/` 再建链 —— 绝不静默覆盖。备份里保留原来的
+相对路径（`~/.config/nvim` 存成 `<备份>/.config/nvim`），所以要恢复就是 `mv` 回对应
+位置，而且 `$HOME` 之外的东西不会和里面的撞名。
+
 ## 核心保证
 
 - **备份而非覆盖**：`safe_link` 会先把目标处的真实文件移到 `~/.dotfiles_backup/<时间戳>/`，并且**保留原来的相对路径**（`~/.config/git/ignore` 存成 `<备份>/.config/git/ignore`）。这样既能从备份本身看出文件原来在哪，两个同名文件也不会互相覆盖。
@@ -290,6 +445,93 @@ $ envup adopt
 1. 个人覆盖从 `~/.zshrc.d/local.zsh` 换到了 `~/.zshrc.local`（旧文件仍会被加载并给出提示，不会丢）。
 2. `envup doctor` 现在默认体检机器；原先的模块写法校验是 `envup doctor --authoring`。
 
+## 日志与排查
+
+```bash
+./envup log              # 最近一次会改动机器的命令的日志
+./envup log --tail       # 实时跟（长安装时有用）
+
+# 日志留在：
+ls ~/.local/state/envup/logs/     # 改过 $ENVUP_STATE_DIR 的话在那底下
+```
+
+**先跑 `envup doctor`。** 它体检这台机器、点名哪里不对，`--fix` 能修掉大部分：
+
+```bash
+./envup doctor          # 这台机器上什么坏了？
+./envup doctor --fix    # 修，然后重查一遍再给结论
+```
+
+还是不行的话：
+1. 看日志 —— 每条命令的退出码、耗时、stderr 都记着。
+2. 用 `--dry-run` 重跑，看它打算做什么。
+3. `ENVUP_LOG_LEVEL=debug` 会打印 provider 的决策过程（为什么走这条路不走那条）。
+4. 模块就在 `modules/<name>/` —— `meta.sh` 是数据，`hooks.sh` 是自定义步骤。
+
+### 常见问题
+
+**模块回来是 `degraded`** —— 这是报告不是失败：配置已链好，只是工具本身在这台机器上
+装不了（通常是没 root 又没有静态发布可退）。`envup doctor` 会点名是哪个工具。等谁把
+包装上就自动生效，不用重装。
+
+**zsh 提示符很朴素 / Powerlevel10k 没了** —— 多半是 clone 时忘了 `--recursive`。
+`envup doctor` 会明确报出来，修法：
+
+```bash
+git submodule update --init --recursive   # 或者：./envup doctor --fix
+./envup install zsh
+```
+
+**`setlocale: cannot change locale`** —— envup 0.2 起不再硬设 locale：它从
+`en_US.UTF-8` / `C.UTF-8` 里挑这台机器真有的那个，只设 `LANG`，永不设 `LC_ALL`。
+还看得到这个警告，说明是你环境里别的东西设的 —— 两种情况 `envup doctor` 都会报。
+
+**装完 `envup: command not found`** —— `zsh` 模块会把 `envup` 链到
+`~/.local/bin/envup`，确认 `~/.local/bin` 在 `$PATH` 上（重新登录，或 `exec zsh`）。
+没在的话 `envup doctor` 会提醒。
+
+**把仓库挪了个位置，全崩了** —— 所有软链都指着旧路径。envup 记录了建链时仓库在哪，
+所以这会是一条消息而不是二十条：`envup doctor --fix` 从新位置重建。
+
+**`envup upgrade` 更新不动源码** —— 它会告诉你是哪一种，而不是只丢一句 git 的原话。
+托管配置被顺着 `~/.zshrc` 软链改了 → 逐个文件列出，用 `envup adopt` 把追加的内容移
+出去（见[配置同步](#配置同步)）。其它未提交改动 → 列出来，给 `git stash`。HEAD 游离
+（之前 `upgrade --ref v0.2.0` 留下的）→ 在联网之前就拦下，并给出
+`envup upgrade --ref main` 这条回去的路。分支没有 upstream、或者压根不是 git 检出 →
+如实说明。
+
+**`nvim too old`** —— NvChad 需要 nvim >= 0.10，而 envup 不动你的系统软件源。用
+`brew install neovim`、`conda install -c conda-forge neovim`（老 glibc 系统如
+RHEL/CentOS 8 上最好用）或源码构建，然后重跑 `envup install nvim`。
+
+**nvim 的 Lazy 插件坏了 / 想要个干净状态** —— `./envup clean nvim` 清掉插件缓存和
+Mason 装的 LSP，不碰你的配置；下次 `./envup install nvim` 从 `lazy-lock.json` 还原
+到钉住的那套。
+
+**网络慢或被墙，`install` / `upgrade` 一直挂着** —— 每个联网操作（git pull、clone、
+子模块更新、nvim Lazy）都套了单命令超时（git 默认 120s，Lazy 600s）。撞上会看到
+`TIMED OUT after Ns` 和调大 `ENVUP_NET_TIMEOUT=...` / `ENVUP_NET_TIMEOUT_NVIM=...`
+的提示。代理/VPN 慢的话：`ENVUP_NET_TIMEOUT=300 ./envup upgrade`。
+
+**macOS 上的 timeout 警告** —— 日志里的 `no 'timeout' command on this system` 意思是
+这次安装没有超时保护。装 GNU coreutils：`brew install coreutils` 提供 `gtimeout`，
+envup 会自动识别。
+
+## 支持的平台
+
+| 平台 | 测试情况 |
+|---|---|
+| macOS（Apple Silicon / Intel）| ✓ |
+| Ubuntu / Debian | ✓ |
+| Fedora / CentOS | ✓（尽力而为）|
+| Arch Linux | ✓（尽力而为）|
+| Alpine | 尽力而为 |
+| WSL2 | ✓ |
+| Docker | ✓ |
+
+bash 的下限是 **4.0**，并且 CI 真的在 `centos:7`（bash 4.2）上跑 —— 不只是文档里
+写写。这个下限覆盖 RHEL/CentOS 7 和 Ubuntu 16.04。
+
 ## 文档
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 架构与关键保证
@@ -297,6 +539,8 @@ $ envup adopt
 - [docs/CLIPBOARD.md](docs/CLIPBOARD.md) —— 用 OSC 52 把服务器上复制的东西送回本机
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 新增模块 / 代码风格 / 测试
 - [CHANGELOG.md](CHANGELOG.md) —— 版本变更与迁移说明
+- [docs/history/](docs/history/) —— 已冻结的历史文档（v0.1 那轮重构的计划与结项），
+  记的是当时为什么那样判断，不是当前架构
 
 ## 许可证
 

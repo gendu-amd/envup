@@ -522,6 +522,24 @@ ones you never exercise on the machine you developed on.
   `lib/manifest.sh`, which loads after `lib/fs.sh` needs it.
 - **`tests/unit/cli.bats`** — the dispatcher's argument handling had no tests at
   all, which is how a hang lived in the option loop.
+- **`tests/integration/oldbash.sh` + a `centos:7` CI job.** envup requires bash
+  4 and every job in CI ran bash 5, so the four minor versions between the
+  declared floor and the tested one were a blind spot — and one of them is where
+  empty-array expansion stopped being an error. The script runs the read-only
+  and dry-run commands and fails on any shell diagnostic in their *output*,
+  because that is the only way this class of bug is visible at all: it goes to
+  stderr and usually leaves the exit code at 0.
+- **`tests/unit/docs.bats`.** Every relative link in the current docs resolves,
+  every repo path they name in backticks exists, and the two READMEs document
+  the same `ENVUP_*` variables. Docs rot with nothing failing and no warning,
+  and the reader who finds out is the one following an instruction that stopped
+  working.
+- **`docs/REFACTOR_{BASELINE,PLAN,REPORT}.md` moved to `docs/history/`** with an
+  index. They are a frozen record of the v0.1 refactor — some of the paths in
+  them (`modules/*/install.sh`) stopped existing when the module contract went
+  to v2 — and they were sitting beside the docs that do track the code. Kept
+  rather than deleted because they record which alternatives were considered and
+  rejected, which neither the code nor `git log` preserves.
 
 ### Fixed
 
@@ -557,9 +575,36 @@ ones you never exercise on the machine you developed on.
   component carries no information, but `sort -V` orders the shorter string
   first — so a tool that reports two components against a three-component floor
   was declared too old and reinstalled on every run.
+- **`envup upgrade` no longer dies on the bash version it declares as its
+  floor.** With no arguments it expanded an empty array under `set -u`, which
+  before bash 4.4 is an error rather than an expansion to nothing:
+  `envup: line 213: fwd[@]: unbound variable`, on CentOS/RHEL 7 (bash 4.2) and
+  Ubuntu 16.04 (4.3) — the machines the no-root work in 0.2.0 was aimed at. The
+  codebase's `"${a[@]+"${a[@]}"}"` form is used in a dozen places and this was
+  the call site that had been missed. It only showed with *no* arguments:
+  `-n` appends `--dry-run` to the same array, so every dry-run test had it
+  non-empty.
+- **CI was not running on this branch at all.** `ci.yml` filtered on
+  `branches: [main, refactor]`, and a bare name matches that branch and nothing
+  under it — so no job had run for a push to `refactor/v0.2` for the length of a
+  release cycle. Now `'refactor/**'`.
+- **`tests/integration/smoke.sh` had been red the whole time**, unseen behind
+  that filter: it still asserted the pre-schema-2 manifest layout
+  (`grep -qx git`) against a file that has been tab-separated columns since
+  0.2.0.
 - `scripts/lint.sh` now covers `modules/*/files/bin/*`.
 - Added `docs/TMUX.md`, referenced from the README since 0.1.0 but never
   written.
+- **README.md described tmux's `default-command`; the config sets
+  `default-shell`.** Its own comment explains at length why they are not
+  interchangeable — only the latter runs a login shell, which is what keeps
+  `module load`, conda and macOS's `path_helper` working in a pane started by
+  something other than your terminal.
+- **README.zh-CN.md was missing whole sections rather than being stale.** Its
+  environment-variable table already matched the English one exactly; the demo
+  output, the module table, the default-shell and nvim explanations, the flow
+  diagram, the troubleshooting list and the platform table had no Chinese
+  counterpart at all.
 
 ## [0.2.0] - 2026-08-15
 

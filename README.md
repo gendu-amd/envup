@@ -333,8 +333,11 @@ The `zsh` module makes zsh the shell you actually land in, on three fronts:
 2. On accounts where `chsh` is blocked (LDAP/SSSD-managed corp/HPC boxes), a
    small guarded block is added to `~/.bashrc` that `exec`s zsh for interactive
    bash. Escape hatch: `NO_ZSH=1 bash`.
-3. The `tmux` module sets `default-command zsh`, so new panes use zsh
-   regardless of the system login shell.
+3. The `tmux` module points `default-shell` at zsh, so new panes use zsh
+   regardless of the system login shell. (`default-shell`, not
+   `default-command`: tmux runs the former as a login shell, which is what
+   keeps `module load`, conda and macOS's `path_helper` working in a pane
+   opened by something other than your terminal.)
 
 `envup uninstall zsh` removes the `~/.bashrc` block (it leaves the `chsh`
 setting alone). If envup created `~/.bashrc` in the first place — a home that
@@ -625,12 +628,16 @@ edited yourself is reported and left alone.
 | WSL2 | ✓ |
 | Docker | ✓ |
 
+The bash floor is **4.0**, and CI actually runs on `centos:7` (bash 4.2) rather
+than only declaring it — which covers RHEL/CentOS 7 and Ubuntu 16.04.
+
 ## Architecture & Contributing
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — design, guarantees, platform detection, mirrors
 - [docs/TMUX.md](docs/TMUX.md) — tmux cheatsheet, the project sessionizer, per-machine config
 - [docs/CLIPBOARD.md](docs/CLIPBOARD.md) — copying from a server to your laptop over OSC 52
 - [CONTRIBUTING.md](CONTRIBUTING.md) — adding modules / profiles, tests, releasing
+- [docs/history/](docs/history/) — frozen: the v0.1 refactor's plan and sign-off. What was decided and why, not how the code looks now.
 - [CHANGELOG.md](CHANGELOG.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md)
 
 ## License
