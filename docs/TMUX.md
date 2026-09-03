@@ -38,7 +38,7 @@ written as `prefix` + key.
 | `/` `?` | search forward / back |
 | drag with the mouse | select — **does not copy**; press `y` |
 | double / triple click | select the word / the line — again, no copy |
-| scroll up | enter copy mode; scrolling back to the bottom does **not** leave it |
+| scroll up | enter copy mode; scroll back to the bottom to leave it again |
 
 Where the machine has its own clipboard tool — a Mac, a Linux desktop — the copy
 is piped straight into it and works in any terminal. Where it does not, which is
@@ -61,9 +61,8 @@ thinks the wrapped lines are.
 
 ### Where the mouse deliberately differs from stock tmux
 
-Three of tmux's own mouse bindings are overridden, and all three for the same
-reason: the default acts on the clipboard, or leaves copy mode, at a moment you
-did not ask it to.
+Two of tmux's own mouse bindings are overridden, both for the same reason: the
+default writes to the clipboard at a moment you did not ask it to.
 
 **Letting go of a drag selects; it does not copy.** tmux copies and cancels on
 release. A trackpad click carries a pixel or two of movement, which counts as a
@@ -74,11 +73,13 @@ nudge. Here the selection stays up and stays adjustable, exactly as after `v`.
 it. Double and triple click are the same story by a second route: stock tmux
 3.x copies on both.
 
-**Scrolling to the bottom does not eject you.** tmux enters copy mode with
-`copy-mode -e`, where `-e` means leave again on reaching the end — so one scroll
-too far drops you into the live view and you have to find your place in the
-scrollback all over again. Leave with `q` instead. The trade is that a casual
-scroll now leaves you in copy mode, so if the keyboard seems dead, press `q`.
+**The wheel is left alone**, which is worth saying because it is the one place
+the reasoning points the other way. Scrolling up enters copy mode and scrolling
+back to the bottom leaves it again (`copy-mode -e`), so glancing at what scrolled
+past costs nothing and you keep typing. The price is that scrolling all the way
+down *while a selection is up* takes the selection with it — but that is rarer
+than the casual glance, and the alternative makes every scroll end in `q`, with
+a pane stuck in copy mode looking like a hung program.
 
 A pane running something that wants the mouse itself — nvim, `less` — still gets
 every event untouched. That test is tmux's own and is kept in each binding.

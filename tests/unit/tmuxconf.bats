@@ -238,15 +238,13 @@ EOF
 # here because a later "cleanup" that drops them as redundant would restore the
 # defaults, and the defaults are the bug.
 
-@test "scrolling to the bottom does not throw you out of copy mode" {
-    # tmux's own WheelUpPane uses `copy-mode -e`, where -e means leave again on
-    # reaching the bottom. One scroll too far and the scrollback position you
-    # were copying from is gone.
-    local line
-    line="$(grep -A2 "^bind -T root WheelUpPane" "$(TMUX_CONF)")"
-    [[ "$line" == *'copy-mode -t='* ]]
-    [[ "$line" != *'copy-mode -e'* ]]
-    [[ "$line" != *'copy-mode -et'* ]]
+@test "the wheel is left to tmux" {
+    # Binding WheelUpPane to `copy-mode` without -e was tried and reverted: it
+    # keeps your place in the scrollback when you overshoot, at the cost of a `q`
+    # after every casual scroll, and a pane stuck in copy mode reads as a hung
+    # program. The comment above this line in the config has the whole argument;
+    # this is here so the next attempt starts by reading it.
+    ! grep -q '^bind -T root Wheel' "$(TMUX_CONF)"
 }
 
 @test "letting go of a drag does not reach the clipboard" {

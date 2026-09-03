@@ -229,17 +229,17 @@ steps in [docs/TMUX.md](docs/TMUX.md) rather than just deleting it.
   client (`detach-on-destroy off`). Once `prefix f` means several projects are
   open at once, closing one of them should no more drop you back to the login
   shell than closing a browser tab should quit the browser.
-- **The mouse selects; only `y` copies.** Three of tmux's own mouse bindings are
-  overridden, all for the same reason — the default acts on the clipboard, or
-  leaves copy mode, at a moment you did not ask it to. Letting go of a drag no
-  longer copies and cancels: a trackpad click carries a pixel or two of movement
-  and counts as a drag, so focusing a pane overwrote the clipboard, and a drag
-  that caught one line too few cost the whole gesture instead of a nudge. Double
-  and triple click select a word and a line instead of copying (stock tmux 3.x
-  copies on both; 2.x binds neither). And scrolling up enters copy mode without
-  `-e`, so scrolling back to the bottom no longer ejects you to the live view
-  with your place in the scrollback lost — `q` leaves. A pane running something
-  that wants the mouse itself, nvim or `less`, still gets every event.
+- **The mouse selects; only `y` copies.** Two of tmux's own mouse bindings are
+  overridden, both for the same reason — the default writes to the clipboard at
+  a moment you did not ask it to. Letting go of a drag no longer copies and
+  cancels: a trackpad click carries a pixel or two of movement and counts as a
+  drag, so focusing a pane overwrote the clipboard, and a drag that caught one
+  line too few cost the whole gesture instead of a nudge. Double and triple
+  click select a word and a line instead of copying (stock tmux 3.x copies on
+  both; 2.x binds neither). A pane running something that wants the mouse
+  itself, nvim or `less`, still gets every event. The wheel is deliberately left
+  as tmux ships it — see the comment in the config for why the obvious change
+  there is a net loss.
 
 ### Three more tools the config was already calling
 
