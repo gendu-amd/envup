@@ -229,11 +229,17 @@ steps in [docs/TMUX.md](docs/TMUX.md) rather than just deleting it.
   client (`detach-on-destroy off`). Once `prefix f` means several projects are
   open at once, closing one of them should no more drop you back to the login
   shell than closing a browser tab should quit the browser.
-- **A mouse drag copies without leaving copy mode**
-  (`copy-selection-no-clear`). tmux's binding is copy-and-cancel, which throws
-  away the selection along with the mode, so a drag that caught one line too few
-  cost the whole gesture instead of a nudge. The copy still reaches the system
-  clipboard over the OSC 52 route.
+- **The mouse selects; only `y` copies.** Three of tmux's own mouse bindings are
+  overridden, all for the same reason — the default acts on the clipboard, or
+  leaves copy mode, at a moment you did not ask it to. Letting go of a drag no
+  longer copies and cancels: a trackpad click carries a pixel or two of movement
+  and counts as a drag, so focusing a pane overwrote the clipboard, and a drag
+  that caught one line too few cost the whole gesture instead of a nudge. Double
+  and triple click select a word and a line instead of copying (stock tmux 3.x
+  copies on both; 2.x binds neither). And scrolling up enters copy mode without
+  `-e`, so scrolling back to the bottom no longer ejects you to the live view
+  with your place in the scrollback lost — `q` leaves. A pane running something
+  that wants the mouse itself, nvim or `less`, still gets every event.
 
 ### Three more tools the config was already calling
 
@@ -587,12 +593,18 @@ ones you never exercise on the machine you developed on.
   tool the OSC 52 path stands exactly as before. `tmux show -gv @envup-copy-cmd`
   says which one this machine picked.
 - **The mouse-drag copy binding was silently dead on tmux before 3.0.** It named
-  `copy-selection-no-clear`, which arrived in 3.0. tmux does not validate the
-  `-X` argument when the key is *bound* — `bind` returns 0 on 2.x and the key
-  does nothing when pressed — so nothing reported it, and `tmux 2.7` is exactly
-  what CentOS 7 ships. The command is now chosen by version, and
-  `tests/unit/tmuxconf.bats` covers the copy bindings, which it previously did
-  not at all.
+  `copy-selection-no-clear`, which arrived in 3.0. tmux validates the `-X`
+  argument neither when the key is *bound* nor when it is *pressed*: on 2.7,
+  `send -X bogus-command` is accepted, does nothing and says nothing. So nothing
+  reported it, and `tmux 2.7` is exactly what CentOS 7 ships. That binding is
+  gone entirely now — a drag no longer copies at all — and
+  `tests/unit/tmuxconf.bats` covers the copy and mouse bindings, which it
+  previously did not at all.
+- **Focusing a pane with the mouse no longer overwrites the clipboard.** Once
+  tmux started piping into `pbcopy` rather than emitting OSC 52 that iTerm2
+  drops, the accidental copies stopped being invisible and started destroying
+  what you had copied. Both routes to it — drag-release and double click — now
+  select without copying. See "The mouse selects; only `y` copies" above.
 - **`envup upgrade` no longer dies on the bash version it declares as its
   floor.** With no arguments it expanded an empty array under `set -u`, which
   before bash 4.4 is an error rather than an expansion to nothing:

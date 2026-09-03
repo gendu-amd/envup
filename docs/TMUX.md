@@ -36,7 +36,9 @@ written as `prefix` + key.
 | `y` | copy and exit — **also reaches the clipboard of your local machine** |
 | `q` | leave copy mode |
 | `/` `?` | search forward / back |
-| drag with the mouse | copy the selection, and **stay** in copy mode |
+| drag with the mouse | select — **does not copy**; press `y` |
+| double / triple click | select the word / the line — again, no copy |
+| scroll up | enter copy mode; scrolling back to the bottom does **not** leave it |
 
 Where the machine has its own clipboard tool — a Mac, a Linux desktop — the copy
 is piped straight into it and works in any terminal. Where it does not, which is
@@ -57,10 +59,64 @@ Linux terminals. Then copy the way you always did. Useful when you want a
 selection that spans panes, or the pane's full width rather than what tmux
 thinks the wrapped lines are.
 
-A mouse drag deliberately does not end copy mode the way tmux's own binding
-does. Letting go throws away the selection there, so a drag that caught one line
-too few costs you the whole gesture instead of a nudge; here the selection is
-still up and still adjustable, and `q` leaves when you are done.
+### Where the mouse deliberately differs from stock tmux
+
+Three of tmux's own mouse bindings are overridden, and all three for the same
+reason: the default acts on the clipboard, or leaves copy mode, at a moment you
+did not ask it to.
+
+**Letting go of a drag selects; it does not copy.** tmux copies and cancels on
+release. A trackpad click carries a pixel or two of movement, which counts as a
+drag, so merely focusing a pane overwrote whatever you had on the clipboard —
+and a drag that caught one line too few cost you the whole gesture instead of a
+nudge. Here the selection stays up and stays adjustable, exactly as after `v`.
+`y` is the one key that reaches the clipboard, and `q` leaves without touching
+it. Double and triple click are the same story by a second route: stock tmux
+3.x copies on both.
+
+**Scrolling to the bottom does not eject you.** tmux enters copy mode with
+`copy-mode -e`, where `-e` means leave again on reaching the end — so one scroll
+too far drops you into the live view and you have to find your place in the
+scrollback all over again. Leave with `q` instead. The trade is that a casual
+scroll now leaves you in copy mode, so if the keyboard seems dead, press `q`.
+
+A pane running something that wants the mouse itself — nvim, `less` — still gets
+every event untouched. That test is tmux's own and is kept in each binding.
+
+## Keys tmux takes away from the shell
+
+`Ctrl-h/j/k/l` are bound at the *root* table by vim-tmux-navigator, so they work
+without the prefix and in any pane. The cost is that the shell never sees them:
+
+| You wanted | You get | Instead press |
+|---|---|---|
+| `Ctrl-l` clear the screen | move to the pane on the right | **`prefix Ctrl-l`** |
+| `Ctrl-h` backspace (some terminals) | move to the pane on the left | `Backspace` |
+
+`prefix Ctrl-l` is the plugin's own compensation binding. There is none for
+`Ctrl-h`; terminals that send `^H` for backspace are rare enough that it has not
+been worth a second special case.
+
+## macOS: check `default-command`
+
+tmux-sensible sets `default-command` to `reattach-to-user-namespace -l $SHELL`
+on macOS when that tool is installed (`sensible.tmux:101`). It is a leftover
+from the days when pasteboard access needed it, and it is usually harmless — but
+`default-command` **wins over `default-shell`**, which is what envup probes for
+and sets, so on a Mac where `chsh` never ran you would silently get bash in
+every pane rather than the zsh envup installed.
+
+```bash
+tmux show -gv default-command      # empty is what you want
+```
+
+If it is not empty and you do not want it, put this in
+`modules/tmux/files/hosts/<hostname>.conf`, which is sourced after everything
+else:
+
+```tmux
+set -g default-command ""
+```
 
 ## Colours and `TERM`
 

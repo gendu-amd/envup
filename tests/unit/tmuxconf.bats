@@ -159,13 +159,12 @@ conf_copy_probe() {
         sed "1s/^run-shell '//; \$s/'\$//"
 }
 
-# A tmux that answers -V with $1 and otherwise echoes the command it was given,
-# so a test can assert on what the probe asked tmux to do.
-stub_tmux_version() {
-    stub_bin tmux <<EOF
+# A tmux that echoes the command it was given, so a test can assert on what the
+# probe asked tmux to do.
+stub_tmux() {
+    stub_bin tmux <<'EOF'
 #!/bin/bash
-[[ "\$1" == -V ]] && { echo "tmux $1"; exit 0; }
-printf '%s\n' "\$*"
+printf '%s\n' "$*"
 EOF
 }
 
@@ -178,7 +177,7 @@ EOF
     # The bug this exists for: on a Mac running tmux locally, copy went out as
     # an escape sequence that iTerm2 drops unless you have turned it on and
     # Terminal.app drops always, while pbcopy sat unused on PATH.
-    stub_tmux_version 3.4
+    stub_tmux
     stub_bin pbcopy <<'EOF'
 #!/bin/sh
 EOF
@@ -186,24 +185,23 @@ EOF
     DISPLAY= run sh -c "$(conf_copy_probe)"
     [ "$status" -eq 0 ]
     [[ "$output" == *"copy-pipe-and-cancel pbcopy"* ]]
-    [[ "$output" == *"MouseDragEnd1Pane send -X copy-pipe-no-clear pbcopy"* ]]
 }
 
 @test "a machine with no clipboard tool is left on the OSC 52 route" {
     # A server you ssh to. Nothing to pipe into, so the static copy-selection
-    # bindings above stand and set-clipboard carries the text to your terminal.
-    stub_tmux_version 3.4
+    # binding above stands and set-clipboard carries the text to your terminal.
+    stub_tmux
     isolate_path
     DISPLAY= run sh -c "$(conf_copy_probe)"
     [[ "$output" != *copy-pipe* ]]
-    [[ "$output" == *"MouseDragEnd1Pane send -X copy-selection-no-clear"* ]]
+    [[ "$output" == *'@envup-copy-cmd'* ]]
 }
 
 @test "xclip without a DISPLAY is not a clipboard" {
     # Same rule as nvim's clipboard.lua: presence on PATH is not enough. Piping
     # into xclip on a headless box copies nothing and prints an error into the
     # pane.
-    stub_tmux_version 3.4
+    stub_tmux
     stub_bin xclip <<'EOF'
 #!/bin/sh
 EOF
@@ -216,7 +214,7 @@ EOF
 @test "an X11 machine with a DISPLAY does get xclip, as one argument" {
     # The command is multi-word, and tmux takes it as a single argv element.
     # Unquoted it would arrive as three and the binding would be nonsense.
-    stub_tmux_version 3.4
+    stub_tmux
     stub_bin xclip <<'EOF'
 #!/bin/sh
 EOF
@@ -225,33 +223,70 @@ EOF
     [[ "$output" == *"copy-pipe-and-cancel xclip -selection clipboard"* ]]
 }
 
-@test "tmux before 3.0 is not handed a command it does not have" {
-    # copy-pipe-no-clear arrived in 3.0. tmux does not check the -X argument
-    # when the key is *bound* — `bind` succeeds on 2.x and the key is then dead
-    # when pressed — so this cannot be attempted and caught, only decided.
-    stub_tmux_version 2.7
+@test "no copy command newer than the oldest tmux we support is used" {
+    # tmux validates the -X argument neither when the key is bound nor when the
+    # key is pressed: on 2.7 `send -X bogus-command` is accepted, does nothing,
+    # and says nothing. So a 3.x-only command here is not a failure anyone would
+    # ever see — it is just a key that stopped working. Checked by name.
+    ! grep -v '^#' "$(TMUX_CONF)" | grep -Eq 'send -X [a-z-]*(no-clear|stop-selection)'
+}
+
+# ---- the mouse -------------------------------------------------------------
+#
+# All three of these override a tmux default rather than adding anything, so
+# what they are worth is exactly the difference from that default. Written down
+# here because a later "cleanup" that drops them as redundant would restore the
+# defaults, and the defaults are the bug.
+
+@test "scrolling to the bottom does not throw you out of copy mode" {
+    # tmux's own WheelUpPane uses `copy-mode -e`, where -e means leave again on
+    # reaching the bottom. One scroll too far and the scrollback position you
+    # were copying from is gone.
+    local line
+    line="$(grep -A2 "^bind -T root WheelUpPane" "$(TMUX_CONF)")"
+    [[ "$line" == *'copy-mode -t='* ]]
+    [[ "$line" != *'copy-mode -e'* ]]
+    [[ "$line" != *'copy-mode -et'* ]]
+}
+
+@test "letting go of a drag does not reach the clipboard" {
+    # The complaint this exists for: a trackpad click carries a pixel or two of
+    # movement, tmux counts that as a drag, and the default MouseDragEnd binding
+    # copied — so focusing a pane silently overwrote the clipboard.
+    grep -q '^unbind -T copy-mode-vi MouseDragEnd1Pane' "$(TMUX_CONF)"
+    ! grep -q 'MouseDragEnd1Pane.*copy-' "$(TMUX_CONF)"
+}
+
+@test "the clipboard probe does not put a drag binding back" {
+    # It runs after the unbind above, so anything it binds wins.
+    stub_tmux
     stub_bin pbcopy <<'EOF'
 #!/bin/sh
 EOF
     isolate_path
     DISPLAY= run sh -c "$(conf_copy_probe)"
-    [[ "$output" == *"MouseDragEnd1Pane send -X copy-pipe pbcopy"* ]]
-    [[ "$output" != *no-clear* ]]
+    [[ "$output" != *MouseDragEnd* ]]
 }
 
-@test "a two-digit major version is not read as older than 3" {
-    stub_tmux_version 10.1
-    stub_bin pbcopy <<'EOF'
-#!/bin/sh
-EOF
-    isolate_path
-    DISPLAY= run sh -c "$(conf_copy_probe)"
-    [[ "$output" == *copy-pipe-no-clear* ]]
+@test "double and triple click select, they do not copy" {
+    # tmux 3.x binds both to copy-pipe-and-cancel: the same clipboard clobbering
+    # as above, by a second route. (2.x does not bind them at all, so on 2.x
+    # these are new.)
+    local line
+    for line in DoubleClick1Pane TripleClick1Pane; do
+        grep -q "^bind -T copy-mode-vi $line" "$(TMUX_CONF)"
+        grep -q "^bind -T root $line" "$(TMUX_CONF)"
+    done
+    ! grep -Eq 'Click1Pane.*copy-(pipe|selection)' "$(TMUX_CONF)"
 }
 
-@test "no -no-clear command is bound unconditionally" {
-    # The regression: the file used to bind copy-selection-no-clear outright,
-    # which is silently dead on every tmux older than 3.0. Anything version
-    # dependent has to come from the probe, not from a static line.
-    ! grep -Eq '^bind .*no-clear' "$(TMUX_CONF)"
+@test "a pane that wants the mouse itself still gets it" {
+    # nvim and less ask the terminal for mouse events. Every root binding here
+    # has to keep tmux's own mouse_any_flag test or it takes those events away,
+    # and the symptom is nvim's mouse silently dying inside tmux only.
+    local binds flags
+    binds="$(grep -c '^bind -T root ' "$(TMUX_CONF)")"
+    flags="$(grep -v '^#' "$(TMUX_CONF)" | grep -c 'mouse_any_flag')"
+    [ "$binds" -gt 0 ]
+    [ "$flags" -eq "$binds" ]
 }
