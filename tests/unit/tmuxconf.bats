@@ -143,3 +143,115 @@ EOF
     [ -n "$n" ]
     [ "$n" -ge 50000 ]
 }
+
+# ---- the clipboard ---------------------------------------------------------
+#
+# Copy is the one thing here that fails without saying anything: the text goes
+# into tmux's buffer either way, and whether it reaches the system clipboard
+# depends on a terminal setting on a machine this config never sees. So the
+# probe is run rather than read.
+
+# The shell command out of the multi-line `run-shell '<this>'` block that picks
+# the clipboard tool. Anchored on a line that is nothing but the opening quote
+# and a continuation, which the one-line run-shells above cannot match.
+conf_copy_probe() {
+    sed -n "/^run-shell '[[:space:]]*.\$/,/^    fi'\$/p" "$(TMUX_CONF)" |
+        sed "1s/^run-shell '//; \$s/'\$//"
+}
+
+# A tmux that answers -V with $1 and otherwise echoes the command it was given,
+# so a test can assert on what the probe asked tmux to do.
+stub_tmux_version() {
+    stub_bin tmux <<EOF
+#!/bin/bash
+[[ "\$1" == -V ]] && { echo "tmux $1"; exit 0; }
+printf '%s\n' "\$*"
+EOF
+}
+
+@test "the clipboard tool is probed, not assumed" {
+    local cmd; cmd="$(conf_copy_probe)"
+    [ -n "$cmd" ]
+}
+
+@test "a machine with pbcopy pipes copies to it instead of out as OSC 52" {
+    # The bug this exists for: on a Mac running tmux locally, copy went out as
+    # an escape sequence that iTerm2 drops unless you have turned it on and
+    # Terminal.app drops always, while pbcopy sat unused on PATH.
+    stub_tmux_version 3.4
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"copy-pipe-and-cancel pbcopy"* ]]
+    [[ "$output" == *"MouseDragEnd1Pane send -X copy-pipe-no-clear pbcopy"* ]]
+}
+
+@test "a machine with no clipboard tool is left on the OSC 52 route" {
+    # A server you ssh to. Nothing to pipe into, so the static copy-selection
+    # bindings above stand and set-clipboard carries the text to your terminal.
+    stub_tmux_version 3.4
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" != *copy-pipe* ]]
+    [[ "$output" == *"MouseDragEnd1Pane send -X copy-selection-no-clear"* ]]
+}
+
+@test "xclip without a DISPLAY is not a clipboard" {
+    # Same rule as nvim's clipboard.lua: presence on PATH is not enough. Piping
+    # into xclip on a headless box copies nothing and prints an error into the
+    # pane.
+    stub_tmux_version 3.4
+    stub_bin xclip <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" != *copy-pipe* ]]
+    [[ "$output" != *xclip* ]]
+}
+
+@test "an X11 machine with a DISPLAY does get xclip, as one argument" {
+    # The command is multi-word, and tmux takes it as a single argv element.
+    # Unquoted it would arrive as three and the binding would be nonsense.
+    stub_tmux_version 3.4
+    stub_bin xclip <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY=:0 run sh -c "$(conf_copy_probe)"
+    [[ "$output" == *"copy-pipe-and-cancel xclip -selection clipboard"* ]]
+}
+
+@test "tmux before 3.0 is not handed a command it does not have" {
+    # copy-pipe-no-clear arrived in 3.0. tmux does not check the -X argument
+    # when the key is *bound* — `bind` succeeds on 2.x and the key is then dead
+    # when pressed — so this cannot be attempted and caught, only decided.
+    stub_tmux_version 2.7
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" == *"MouseDragEnd1Pane send -X copy-pipe pbcopy"* ]]
+    [[ "$output" != *no-clear* ]]
+}
+
+@test "a two-digit major version is not read as older than 3" {
+    stub_tmux_version 10.1
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" == *copy-pipe-no-clear* ]]
+}
+
+@test "no -no-clear command is bound unconditionally" {
+    # The regression: the file used to bind copy-selection-no-clear outright,
+    # which is silently dead on every tmux older than 3.0. Anything version
+    # dependent has to come from the probe, not from a static line.
+    ! grep -Eq '^bind .*no-clear' "$(TMUX_CONF)"
+}

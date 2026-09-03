@@ -575,6 +575,24 @@ ones you never exercise on the machine you developed on.
   component carries no information, but `sort -V` orders the shorter string
   first — so a tool that reports two components against a three-component floor
   was declared too old and reinstalled on every run.
+- **tmux copies into the machine's own clipboard when it has one, instead of
+  always going out as OSC 52.** On a Mac running tmux locally the copy was an
+  escape sequence that iTerm2 drops unless you have turned it on and
+  Terminal.app drops always — so `y` and mouse-drag put nothing on the
+  clipboard, while `pbcopy` sat unused on `PATH`. nvim has always made this
+  distinction (`clipboard.lua`'s "only take over when there is nothing better");
+  tmux did not, and the two disagreeing was the bug. Same probe, same order,
+  same rule that presence on `PATH` is not enough — `xclip` with no `DISPLAY`
+  is an error message, not a clipboard. Servers are unaffected: with no native
+  tool the OSC 52 path stands exactly as before. `tmux show -gv @envup-copy-cmd`
+  says which one this machine picked.
+- **The mouse-drag copy binding was silently dead on tmux before 3.0.** It named
+  `copy-selection-no-clear`, which arrived in 3.0. tmux does not validate the
+  `-X` argument when the key is *bound* — `bind` returns 0 on 2.x and the key
+  does nothing when pressed — so nothing reported it, and `tmux 2.7` is exactly
+  what CentOS 7 ships. The command is now chosen by version, and
+  `tests/unit/tmuxconf.bats` covers the copy bindings, which it previously did
+  not at all.
 - **`envup upgrade` no longer dies on the bash version it declares as its
   floor.** With no arguments it expanded an empty array under `set -u`, which
   before bash 4.4 is an error rather than an expansion to nothing:

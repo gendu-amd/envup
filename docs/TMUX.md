@@ -38,9 +38,24 @@ written as `prefix` + key.
 | `/` `?` | search forward / back |
 | drag with the mouse | copy the selection, and **stay** in copy mode |
 
-The copy goes out over OSC 52, so it works on any server without X11
-forwarding or root. It needs one setting in your terminal — see
-[docs/CLIPBOARD.md](CLIPBOARD.md).
+Where the machine has its own clipboard tool — a Mac, a Linux desktop — the copy
+is piped straight into it and works in any terminal. Where it does not, which is
+every server you `ssh` to, it goes out over OSC 52 instead: no X11 forwarding
+and no root, but it needs one setting in your terminal. Both cases, and how to
+tell which one you are in, are in [docs/CLIPBOARD.md](CLIPBOARD.md).
+
+### Selecting with the mouse the *terminal's* way
+
+`mouse on` means tmux gets the drag, so your terminal's own selection — the one
+`Cmd-C` copies — never happens. That is the price of clicking between panes and
+dragging borders to resize, and it catches people out on macOS in particular,
+because the old habit fails silently rather than visibly.
+
+**Hold a modifier while you drag** to hand the mouse back to the terminal for
+that one gesture: `Option` in iTerm2, `Fn` in Terminal.app, `Shift` in most
+Linux terminals. Then copy the way you always did. Useful when you want a
+selection that spans panes, or the pane's full width rather than what tmux
+thinks the wrapped lines are.
 
 A mouse drag deliberately does not end copy mode the way tmux's own binding
 does. Letting go throws away the selection there, so a drag that caught one line
