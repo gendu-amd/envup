@@ -35,9 +35,9 @@ tmux show -gv @envup-copy-cmd    # what tmux picked here; empty means OSC 52
 
 Then, in practice:
 
-- **tmux**: enter copy mode (`prefix + [`), select with `v`, copy with `y`.
-  A mouse drag or a double click selects too — but only `y` copies, on purpose;
-  see [docs/TMUX.md](TMUX.md).
+- **tmux**: enter copy mode (`prefix + [`), select with `v`, copy with `y`,
+  `Enter` or `Ctrl-c`. A mouse drag or a double click selects too — but
+  selecting never copies, on purpose; see [docs/TMUX.md](TMUX.md).
 - **nvim**: just yank. NvChad sets `clipboard=unnamedplus`, so `y`, `dd` and
   friends all go to the system clipboard.
 
@@ -126,7 +126,9 @@ want the escape sequence instead, unset the choice in
 else:
 
 ```tmux
-bind -T copy-mode-vi y send -X copy-selection-and-cancel
+bind -T copy-mode-vi y     send -X copy-selection-and-cancel
+bind -T copy-mode-vi Enter send -X copy-selection-and-cancel
+bind -T copy-mode-vi C-c   send -X copy-selection-and-cancel
 ```
 
 **Large copies are refused, loudly.** Terminals cap the size of a single escape

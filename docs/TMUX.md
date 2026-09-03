@@ -33,8 +33,8 @@ written as `prefix` + key.
 |---|---|
 | `prefix [` | enter copy mode |
 | `v` | start selecting |
-| `y` | copy and exit — **also reaches the clipboard of your local machine** |
-| `q` | leave copy mode |
+| `y`, `Enter`, `Ctrl-c` | copy and exit — **also reaches the clipboard of your local machine** |
+| `q` | leave copy mode without copying |
 | `/` `?` | search forward / back |
 | drag with the mouse | select — **does not copy**; press `y` |
 | double / triple click | select the word / the line — again, no copy |
@@ -69,9 +69,16 @@ release. A trackpad click carries a pixel or two of movement, which counts as a
 drag, so merely focusing a pane overwrote whatever you had on the clipboard —
 and a drag that caught one line too few cost you the whole gesture instead of a
 nudge. Here the selection stays up and stays adjustable, exactly as after `v`.
-`y` is the one key that reaches the clipboard, and `q` leaves without touching
-it. Double and triple click are the same story by a second route: stock tmux
-3.x copies on both.
+`y`, `Enter` and `Ctrl-c` are what reach the clipboard, and `q` leaves without
+touching it. Double and triple click are the same story by a second route: stock
+tmux 3.x copies on both.
+
+`Ctrl-c` is tmux's own "leave copy mode", which `q` already does; copying on the
+way out is the more useful meaning, and it still leaves when nothing is
+selected. It does **not** change `Ctrl-c` in a shell — the copy-mode key table
+only exists while you are in copy mode, and an interrupt never goes through a
+key table at all. `Cmd-C` and `Ctrl-Shift-C` cannot be bound: the terminal takes
+those before tmux sees them. For those, use the modifier-drag below.
 
 **The wheel is left alone**, which is worth saying because it is the one place
 the reasoning points the other way. Scrolling up enters copy mode and scrolling

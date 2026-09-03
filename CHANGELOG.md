@@ -592,6 +592,14 @@ ones you never exercise on the machine you developed on.
   is an error message, not a clipboard. Servers are unaffected: with no native
   tool the OSC 52 path stands exactly as before. `tmux show -gv @envup-copy-cmd`
   says which one this machine picked.
+- **`Enter` copies the same way `y` does.** tmux binds `Enter` to
+  copy-selection-and-cancel itself, and only `y` was repointed at the native
+  clipboard tool — so on a Mac the same selection reached the clipboard or
+  silently did not, depending on which key you happened to finish with. Both are
+  now bound together, and so is `Ctrl-c`, whose stock meaning in copy mode is
+  "leave", which `q` already covers. `Ctrl-c` in a shell is untouched: the
+  copy-mode key table only exists inside copy mode, and an interrupt does not go
+  through a key table.
 - **The mouse-drag copy binding was silently dead on tmux before 3.0.** It named
   `copy-selection-no-clear`, which arrived in 3.0. tmux validates the `-X`
   argument neither when the key is *bound* nor when it is *pressed*: on 2.7,

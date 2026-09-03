@@ -45,8 +45,16 @@ CLIP_LUA()  { printf '%s' "$REPO_ROOT/modules/nvim/files/lua/configs/clipboard.l
     grep -q 'set -ga terminal-overrides' "$(TMUX_CONF)"
 }
 
-@test "copy-mode y reaches the clipboard rather than only tmux's buffer" {
-    grep -q 'copy-mode-vi y send -X copy-selection-and-cancel' "$(TMUX_CONF)"
+@test "copy-mode reaches the clipboard rather than only tmux's buffer" {
+    # Every key that finishes a copy, not just y: Enter is bound by tmux itself
+    # and was once left on the stock binding while y had been repointed at the
+    # machine's own clipboard tool. Which key is bound to what is
+    # tests/unit/tmuxconf.bats; this is the OSC 52 half of it.
+    local k
+    for k in y Enter C-c; do
+        grep -Eq "copy-mode-vi $k[[:space:]]+send -X copy-selection-and-cancel" \
+            "$(TMUX_CONF)"
+    done
 }
 
 @test "the tmux clipboard config is valid tmux syntax" {

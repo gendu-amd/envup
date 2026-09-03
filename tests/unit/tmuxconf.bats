@@ -187,6 +187,28 @@ EOF
     [[ "$output" == *"copy-pipe-and-cancel pbcopy"* ]]
 }
 
+@test "every key that copies is repointed, not just y" {
+    # The bug in the first version of this: Enter is bound by tmux itself to
+    # copy-selection-and-cancel, and only y was repointed at the native tool. So
+    # on a Mac the same selection reached the clipboard or silently did not,
+    # depending on which key you finished with — the original defect, by a key
+    # nobody thought to check.
+    local k out
+    stub_tmux
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    out="$(DISPLAY= sh -c "$(conf_copy_probe)")"
+    for k in y Enter C-c; do
+        # bound to the tool by the probe...
+        [[ "$out" == *"bind -T copy-mode-vi $k send -X copy-pipe-and-cancel pbcopy"* ]]
+        # ...and to the OSC 52 baseline in the file, for machines with no tool.
+        grep -Eq "^bind -T copy-mode-vi $k +send -X copy-selection-and-cancel\$" \
+            "$(TMUX_CONF)"
+    done
+}
+
 @test "a machine with no clipboard tool is left on the OSC 52 route" {
     # A server you ssh to. Nothing to pipe into, so the static copy-selection
     # binding above stands and set-clipboard carries the text to your terminal.
