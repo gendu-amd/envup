@@ -66,12 +66,31 @@ dofile(vim.g.base46_cache .. "statusline")
 
 require "options"
 require "autocmds"
+-- After options: NvChad sets clipboard=unnamedplus, and this decides where that
+-- actually goes on a machine with no clipboard tool. See configs/clipboard.lua.
+require "configs.clipboard"
+-- Writes Session.vim while you work, so a tmux pane that a reboot took down
+-- comes back with your files in it. No-op outside tmux. See configs/session.lua.
+require("configs.session").setup()
+-- Keeps a 200 MB log from taking the editor down with it. See configs/bigfile.lua.
+require("configs.bigfile").setup()
 
 vim.schedule(function()
   require "mappings"
 end)
 
--- Per-machine overrides: ~/.config/nvim/local.lua (NOT in envup repo).
--- Loaded LAST so it can override plugins/theme/options/mappings for this host.
--- pcall keeps a missing file or a typo from breaking nvim startup.
-pcall(dofile, vim.fn.stdpath("config") .. "/local.lua")
+-- Per-machine overrides, in two layers. Both load LAST so either can override
+-- plugins/theme/options/mappings, and pcall keeps a missing file or a typo in
+-- one from taking nvim's startup down with it.
+--
+--   hosts/<hostname>.lua  IN the repo: committed, so it syncs to your other
+--                         machines and survives a rebuild — and stays separate
+--                         from them on a home directory shared over NFS.
+--                         Start from hosts/example.lua.template.
+--   local.lua             NOT in the repo: private to this machine, wins.
+local _cfg = vim.fn.stdpath "config"
+local _host = (vim.uv.os_gethostname() or ""):gsub("%..*$", "")
+if _host ~= "" then
+  pcall(dofile, _cfg .. "/hosts/" .. _host .. ".lua")
+end
+pcall(dofile, _cfg .. "/local.lua")

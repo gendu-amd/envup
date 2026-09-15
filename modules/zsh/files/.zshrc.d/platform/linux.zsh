@@ -1,32 +1,33 @@
 # ============================================
-# Linux Specific Configuration
+# Linux
 # ============================================
+# Loaded from slice 20, so anything put on PATH here is visible to the tool and
+# alias slices that follow.
 
-# Clipboard (macOS-style aliases)
-if command -v xclip &>/dev/null; then
+if (( $+commands[xclip] )); then
     alias pbcopy="xclip -selection clipboard"
     alias pbpaste="xclip -selection clipboard -o"
-elif command -v xsel &>/dev/null; then
+elif (( $+commands[xsel] )); then
     alias pbcopy="xsel --clipboard --input"
     alias pbpaste="xsel --clipboard --output"
 fi
 
-# System info
 alias meminfo="free -h"
 alias cpuinfo="lscpu"
 
-# ROCm environment (AMD GPU)
-if [[ -d "/opt/rocm" ]]; then
+# GPU toolchains. Appended through the slice-10 helpers: the old
+# `export PATH=$PATH:$ROCM_PATH/bin` re-appended in every nested shell, so a
+# tmux pane inside an ssh session inside a container carried the same entry
+# three times over.
+if [[ -d /opt/rocm ]]; then
     export ROCM_PATH=/opt/rocm
-    export PATH=${PATH}:${ROCM_PATH}/bin
-    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:${ROCM_PATH}/lib
-    # ROCm profiler shortcut
+    path_append "$ROCM_PATH/bin"
+    envvar_path_append LD_LIBRARY_PATH "$ROCM_PATH/lib"
     alias rprof="rocprof --stats"
 fi
 
-# CUDA environment (NVIDIA GPU)
-if [[ -d "/usr/local/cuda" ]]; then
+if [[ -d /usr/local/cuda ]]; then
     export CUDA_HOME=/usr/local/cuda
-    export PATH=${PATH}:${CUDA_HOME}/bin
-    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}:${CUDA_HOME}/lib64
+    path_append "$CUDA_HOME/bin"
+    envvar_path_append LD_LIBRARY_PATH "$CUDA_HOME/lib64"
 fi

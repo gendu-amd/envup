@@ -17,14 +17,14 @@ teardown() {
     [[ "$output" == *"install order: zsh git"* ]]
 }
 
-@test "standard resolves to: zsh git tmux fzf zoxide atuin" {
+@test "standard adds portable terminal essentials" {
     HOME="$TEST_HOME" run "$REPO_ROOT/envup" install -p standard --dry-run
     [ "$status" -eq 0 ]
-    [[ "$output" == *"install order: zsh git tmux fzf zoxide atuin"* ]]
+    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv jq tealdeer"* ]]
 }
 
-@test "full resolves to: zsh git tmux fzf zoxide atuin nvim" {
+@test "full adds the editor and interactive terminal tools" {
     HOME="$TEST_HOME" run "$REPO_ROOT/envup" install -p full --dry-run
     [ "$status" -eq 0 ]
-    [[ "$output" == *"install order: zsh git tmux fzf zoxide atuin nvim"* ]]
+    [[ "$output" == *"install order: zsh git tmux fzf ripgrep fd bat eza zoxide atuin delta direnv jq tealdeer nvim lazygit yazi"* ]]
 }

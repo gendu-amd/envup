@@ -1,58 +1,45 @@
 # ============================================
-# WSL2 Specific Configuration
+# WSL2
 # ============================================
-
-# Inherit Linux config first
 [[ -f "${0:A:h}/linux.zsh" ]] && source "${0:A:h}/linux.zsh"
 
-# Windows integration
-# Detect Windows system drive dynamically (usually /mnt/c, but configurable)
-_win_drive="/mnt/c"
-if [[ -d "/mnt/c/Windows" ]]; then
-    _win_drive="/mnt/c"
-elif [[ -d "/mnt/d/Windows" ]]; then
-    _win_drive="/mnt/d"
-fi
+# Exported, not a local: the win* functions below read it when they are
+# called, which is long after this file has finished.
+export WIN_DRIVE="/mnt/c"
+[[ -d /mnt/d/Windows && ! -d /mnt/c/Windows ]] && WIN_DRIVE="/mnt/d"
 
-export BROWSER="${_win_drive}/Windows/System32/cmd.exe /c start"
+export BROWSER="${WIN_DRIVE}/Windows/System32/cmd.exe /c start"
+export DONT_PROMPT_WSL_INSTALL=1
 
-# Windows clipboard integration
 alias clip="clip.exe"
 alias pbcopy="clip.exe"
 alias pbpaste="powershell.exe -command 'Get-Clipboard' | tr -d '\r'"
-
-# Open Windows Explorer
 alias explorer="explorer.exe"
 alias open="explorer.exe"
-
-# Open with default Windows application
 alias wslopen="cmd.exe /c start"
 
-# Get Windows username
+# win_user — the Windows account name, cached.
+#
+# This used to call cmd.exe twice on every shell start: 200-500ms each, both on
+# the critical path to the prompt, to answer a question whose answer never
+# changes. Now it is read once and written to the cache; delete the file if you
+# ever need it re-detected.
 win_user() {
-    cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r'
+    local cache="${XDG_CACHE_HOME:-$HOME/.cache}/envup/win_user"
+    if [[ -s "$cache" ]]; then
+        cat "$cache"
+        return 0
+    fi
+    local u
+    u="$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n')"
+    [[ -n "$u" ]] || return 1
+    mkdir -p "${cache:h}" && print -r -- "$u" > "$cache"
+    print -r -- "$u"
 }
 
-# Windows home directory
-export WIN_HOME="${_win_drive}/Users/$(win_user 2>/dev/null)"
-
-# Quick access to Windows directories (only if paths exist)
-[[ -d "$WIN_HOME" ]] && alias winhome="cd $WIN_HOME"
-[[ -d "$WIN_HOME/Desktop" ]] && alias windesk="cd $WIN_HOME/Desktop"
-[[ -d "$WIN_HOME/Downloads" ]] && alias windl="cd $WIN_HOME/Downloads"
-
-unset _win_drive
-
-# VS Code integration (if installed)
-if command -v code &>/dev/null; then
-    alias code="code"
-elif [[ -x "/mnt/c/Users/$(win_user)/AppData/Local/Programs/Microsoft VS Code/bin/code" ]]; then
-    alias code="/mnt/c/Users/$(win_user)/AppData/Local/Programs/Microsoft\ VS\ Code/bin/code"
-fi
-
-# Docker Desktop integration (if using Docker Desktop)
-# WSL2 backend is automatically configured
-
-# Fix interop issues
-export DONT_PROMPT_WSL_INSTALL=1
-
+# Resolved lazily for the same reason: WIN_HOME is only interesting if you
+# actually reach for it, and a startup that shells out to Windows is a startup
+# you feel.
+winhome() { cd "${WIN_DRIVE}/Users/$(win_user)" }
+windesk() { cd "${WIN_DRIVE}/Users/$(win_user)/Desktop" }
+windl()   { cd "${WIN_DRIVE}/Users/$(win_user)/Downloads" }

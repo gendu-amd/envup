@@ -25,7 +25,9 @@ echo "==> install git"
 [ -L "$SMOKE_HOME/.gitconfig" ] || fail ".gitconfig symlink not created"
 [[ "$(readlink -f "$SMOKE_HOME/.gitconfig")" == "$REPO_ROOT"/* ]] \
     || fail ".gitconfig does not point into the repo"
-grep -qx git "$SMOKE_HOME/.local/state/envup/installed" \
+# The manifest is tab-separated since schema 2 (module, state, provider,
+# version, time) — the module name is the first field, not the whole line.
+cut -f1 "$SMOKE_HOME/.local/state/envup/installed" | grep -qx git \
     || fail "manifest missing git after install"
 
 echo "==> status"

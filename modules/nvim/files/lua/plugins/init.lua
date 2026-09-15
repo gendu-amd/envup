@@ -1,7 +1,16 @@
+local tools = require "configs.tools"
+
 return {
   {
     "stevearc/conform.nvim",
-    -- event = 'BufWritePre', -- uncomment for format on save
+    -- Loaded on the first save (lazy.nvim replays the event afterwards) so
+    -- format_on_save in configs/conform.lua is actually reached, and on
+    -- :ConformInfo, which is how you find out why a formatter did nothing.
+    -- envup installs every formatter declared in configs/tools.lua after the
+    -- pinned plugins are restored. Conform still skips a missing command so an
+    -- interrupted/offline install leaves the editor usable rather than broken.
+    event = "BufWritePre",
+    cmd = "ConformInfo",
     opts = require "configs.conform",
   },
 
@@ -20,7 +29,7 @@ return {
     dependencies = { "williamboman/mason.nvim" },
     config = function()
       require("mason-lspconfig").setup({
-        ensure_installed = { "clangd", "pyright", "lua_ls", "bashls" },
+        ensure_installed = tools.lsp_servers,
         -- lspconfig.setup() runs for the same servers in configs/lspconfig.lua;
         -- leaving automatic_installation on races ensure_installed →
         -- "Package is already installing" (clangd, …) on first launch.
@@ -36,6 +45,7 @@ return {
     -- relies on. v1.x retains it. Pair this with the NvChad commit pin above.
     -- Bump once you're on nvim >= 0.11 AND moved off the old API.
     version = "^1",
+    event = { "BufReadPre", "BufNewFile" },
     dependencies = { "williamboman/mason-lspconfig.nvim" },
     config = function()
       require "configs.lspconfig"
@@ -131,18 +141,9 @@ return {
   -- 5. vim-tmux-navigator: Seamless Ctrl+h/j/k/l navigation between nvim and tmux
   {
     "christoomey/vim-tmux-navigator",
+    -- The plugin's mappings load before NvChad's defaults on an empty startup
+    -- and get overwritten there. lua/mappings.lua owns the final normal-mode
+    -- bindings; the plugin still supplies its commands and terminal mappings.
     lazy = false,
-    cmd = {
-      "TmuxNavigateLeft",
-      "TmuxNavigateDown",
-      "TmuxNavigateUp",
-      "TmuxNavigateRight",
-    },
-    keys = {
-      { "<C-h>", "<cmd>TmuxNavigateLeft<cr>", desc = "Navigate Left" },
-      { "<C-j>", "<cmd>TmuxNavigateDown<cr>", desc = "Navigate Down" },
-      { "<C-k>", "<cmd>TmuxNavigateUp<cr>", desc = "Navigate Up" },
-      { "<C-l>", "<cmd>TmuxNavigateRight<cr>", desc = "Navigate Right" },
-    },
   },
 }

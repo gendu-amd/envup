@@ -22,3 +22,9 @@
 [submodule "modules/tmux/files/plugins/vim-tmux-navigator"]
 	path = modules/tmux/files/plugins/vim-tmux-navigator
 	url = https://github.com/christoomey/vim-tmux-navigator.git
+[submodule "modules/zsh/files/plugins/fzf-tab"]
+	path = modules/zsh/files/plugins/fzf-tab
+	url = https://github.com/Aloxaf/fzf-tab.git
+[submodule "modules/zsh/files/plugins/zsh-completions"]
+	path = modules/zsh/files/plugins/zsh-completions
+	url = https://github.com/zsh-users/zsh-completions.git

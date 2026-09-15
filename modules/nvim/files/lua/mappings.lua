@@ -10,6 +10,15 @@ local map = vim.keymap.set
 
 map("i", "jk", "<ESC>")
 
+-- NvChad also maps these to plain <C-w>h/j/k/l. Put the tmux-aware commands
+-- in the final user mapping layer so an empty `nvim` startup and a file-backed
+-- buffer behave the same: move through nvim splits, then cross the tmux pane
+-- boundary when there is no split left in that direction.
+map("n", "<C-h>", "<cmd>TmuxNavigateLeft<cr>", { desc = "Navigate left (nvim/tmux)" })
+map("n", "<C-j>", "<cmd>TmuxNavigateDown<cr>", { desc = "Navigate down (nvim/tmux)" })
+map("n", "<C-k>", "<cmd>TmuxNavigateUp<cr>", { desc = "Navigate up (nvim/tmux)" })
+map("n", "<C-l>", "<cmd>TmuxNavigateRight<cr>", { desc = "Navigate right (nvim/tmux)" })
+
 -- Visual block mode alias.
 -- The standard vim key for visual-block is <C-v>, but most GUI/embedded
 -- terminals (VSCode/Cursor integrated terminal, Windows Terminal, MobaXterm,
