@@ -1,0 +1,29 @@
+# ============================================
+# hosts/<short-hostname>.gitconfig — git config for one machine, committed
+# ============================================
+# Copy this to hosts/$(hostname -s).gitconfig, edit, then:
+#
+#   envup install git         # links it to ~/.gitconfig.host
+#
+# Included after the generated ~/.gitconfig.envup and before ~/.gitconfig.local,
+# so it overrides envup's detection and your private file overrides it.
+#
+# Identity does NOT belong here — this file is committed. Put user.name and
+# user.email in ~/.gitconfig.local.
+
+# --- a work machine that must not push with your personal identity -----------
+# [url "git@github.corp.example.com:"]
+#     insteadOf = https://github.corp.example.com/
+
+# --- corporate proxy for https remotes ---------------------------------------
+# [http]
+#     proxy = http://proxy.corp:8080
+
+# --- this machine's editor, if $EDITOR is not the answer you want ------------
+# [core]
+#     editor = vim
+
+# --- a slow or shared filesystem ---------------------------------------------
+# [core]
+#     fsmonitor = false
+#     untrackedCache = true

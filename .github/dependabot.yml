@@ -1,0 +1,44 @@
+version: 2
+
+# What this repo actually depends on is unusual, so it is worth saying which
+# risk each entry covers.
+#
+# There is no package.json, no requirements.txt and no go.mod here — envup is
+# shell. Its supply chain is instead (a) the actions this workflow runs with a
+# repo checkout and a token, and (b) the git submodules under modules/*/files,
+# whose contents are sourced into every interactive shell on every machine
+# envup has ever touched. Both are third-party code that runs with the user's
+# privileges, and neither had any update or advisory channel before this file.
+#
+# The prebuilt binaries envup downloads at install time are *not* here: they are
+# resolved at runtime from GitHub releases, pinned in versions.lock, and checked
+# against their published digest by lib/net.sh. Dependabot cannot see them.
+
+updates:
+  # Pinned to SHAs in ci.yml. Dependabot is what makes that maintainable — it
+  # bumps the SHA and rewrites the trailing version comment, so pinning does not
+  # decay into "frozen on whatever was current the day we pinned".
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+
+  # oh-my-zsh plugins, tmux plugins, TPM. A compromised or merely broken commit
+  # here lands in ~/.zshrc's plugin list, not in a build step. Grouped because
+  # they move together and eleven separate PRs a month is how a bot gets muted.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+    groups:
+      shell-plugins:
+        patterns:
+          - "*"

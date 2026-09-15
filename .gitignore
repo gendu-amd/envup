@@ -1,0 +1,18 @@
+# Legacy in-repo zsh override; use ~/.zshrc.local instead.
+modules/zsh/files/.zshrc.d/local.zsh
+
+# Editors and OS metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local Nvim config and runtime logs
+modules/nvim/files/local.lua
+*.nvimlog
+
+# Generated code-analysis state
+.understand-anything/

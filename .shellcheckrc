@@ -1,0 +1,12 @@
+# envup shellcheck configuration
+# Resolve `source ./x` and `# shellcheck source=` relative to each script's own
+# directory (module hooks `source ./meta.sh` from their module dir at runtime).
+source-path=SCRIPTDIR
+external-sources=true
+
+# Dynamic sourcing is intentional and pervasive:
+#   - module_meta()      sources modules/<m>/meta.sh   (path built at runtime)
+#   - load_profile()     sources profiles/<name>.sh
+#   - run_module_hook()  sources modules/<m>/{install,uninstall}.sh
+# The sourced paths are only known at runtime, so silence "can't follow source".
+disable=SC1090,SC1091
