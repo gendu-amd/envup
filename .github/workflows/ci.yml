@@ -26,7 +26,7 @@ jobs:
     name: lint (shellcheck + bash -n)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint shell sources
@@ -36,7 +36,7 @@ jobs:
     name: unit (bats)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # release.bats verifies every released version has a real tag.
           fetch-depth: 0
@@ -53,7 +53,7 @@ jobs:
     name: integration (dry-run + cli)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install bats + jq
         run: sudo apt-get update && sudo apt-get install -y bats jq
       - name: Run integration tests
@@ -63,7 +63,7 @@ jobs:
     name: no-root install (unprivileged container)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       # The scenario envup 0.2 exists for: a server where you have an account
@@ -99,7 +99,7 @@ jobs:
     name: offline install (no network egress)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install zsh
@@ -124,7 +124,7 @@ jobs:
     name: bash 4.2 (the declared floor)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # envup requires bash >= 4 and every other job here runs bash 5, so the
       # versions between the floor and the tested floor were never exercised.
       # centos:7 is bash 4.2.46 — the oldest bash envup claims to accept, and
@@ -143,7 +143,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # macOS ships bash 3.2; envup re-execs into Homebrew bash (>= 4). Install
       # it so that path is exercised in CI.
       - name: Install bash >= 4 (macOS)
@@ -168,7 +168,7 @@ jobs:
         # and old machines are the ones you cannot upgrade.
         image: [fedora:latest, archlinux:latest, alpine:latest, debian:11]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Run the smoke test inside each distro via docker (checkout stays on the
       # host, so we avoid node-in-container issues). Each distro installs bash +
       # git with its own package manager, then runs the smoke script.
