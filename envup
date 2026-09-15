@@ -1,0 +1,415 @@
+#!/usr/bin/env bash
+# ============================================
+# envup — your dotfiles + dev tools on any machine, with one command.
+# ============================================
+# Thin CLI over lib.sh. A "module" is a directory under modules/<name>/ with:
+#   meta.sh        pure declarative data — what to install, verify, link, clean
+#   hooks.sh       optional functions (pre_install / post_install / ...) for the
+#                  steps no amount of data can express
+#   files/         configs that get symlinked into $HOME
+# lib/engine.sh drives all of it; nothing here knows how a module installs.
+# A "profile" is profiles/<name>.sh declaring MODULES=(...).
+#
+# Commands: install / uninstall / upgrade / status / doctor / adopt / clean / clangd / log.
+# Behaviour: configs are symlinks (edit in repo, git pull applies instantly);
+# a pre-existing real file at a link target is always backed up to
+# ~/.dotfiles_backup/<ts>/ before linking; uninstall only removes envup's own
+# symlinks. Honours ENVUP_DRY_RUN / --dry-run everywhere.
+# ============================================
+set -uo pipefail
+
+# macOS ships bash 3.2 at /bin/bash (licensing). envup needs bash >= 4. If the
+# current shell is too old, re-exec with Homebrew bash when installed — no PATH
+# surgery required as long as `brew install bash` has been run once.
+if [[ "$(uname -s)" == Darwin ]] && (( BASH_VERSINFO[0] < 4 )); then
+    _envup_bash=""
+    for _envup_bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        if [[ -x "$_envup_bash" ]] && "$_envup_bash" -c '(( BASH_VERSINFO[0] >= 4 ))'; then
+            exec "$_envup_bash" "$0" "$@"
+        fi
+    done
+    unset _envup_bash
+fi
+
+(( BASH_VERSINFO[0] >= 4 )) || {
+    echo "envup: bash >= 4 required (running $BASH_VERSION)." >&2
+    if [[ "$(uname -s)" == Darwin ]]; then
+        echo "  macOS: install once with 'brew install bash', then re-run ./envup" >&2
+        echo "  (envup auto-uses Homebrew bash; you do NOT need to change your login shell)" >&2
+    fi
+    exit 1
+}
+
+# This entry point is also linked to ~/.local/bin/envup by the zsh module. Bash
+# leaves BASH_SOURCE[0] as the path used to invoke the script, so dirname alone
+# would mistake ~/.local/bin for the repo and try to source ~/.local/bin/lib.sh.
+# Resolve the link ourselves instead of using readlink -f: macOS's BSD readlink
+# has no -f, and supporting an unmodified macOS is part of the CLI contract.
+_envup_source="${BASH_SOURCE[0]}"
+while [[ -L "$_envup_source" ]]; do
+    _envup_link_dir="$(cd -P "$(dirname "$_envup_source")" && pwd)" || exit 1
+    _envup_source="$(readlink "$_envup_source")" || exit 1
+    [[ "$_envup_source" == /* ]] || _envup_source="$_envup_link_dir/$_envup_source"
+done
+ENVUP_HOME="$(cd -P "$(dirname "$_envup_source")" && pwd)"; export ENVUP_HOME
+unset _envup_source _envup_link_dir
+source "$ENVUP_HOME/lib.sh"
+export ENVUP_BACKUP_DIR
+
+# Version: prefer the committed VERSION file, fall back to git describe.
+envup_version() {
+    if [[ -r "$ENVUP_HOME/VERSION" ]]; then
+        cat "$ENVUP_HOME/VERSION"
+    else
+        ( cd "$ENVUP_HOME" && git describe --tags --always 2>/dev/null ) || echo unknown
+    fi
+}
+
+# ---- install -------------------------------------------------------------
+cmd_install() {
+    local profile="" dry=0; local -a mods=()
+    while (($#)); do case "$1" in
+        -p|--profile) profile="${2:-}"; [[ -n "$profile" ]] || { log_error "--profile needs a name"; return 1; }; shift 2 ;;
+        -n|--dry-run) dry=1; shift ;;
+        -h|--help) cat <<EOF
+Usage: envup install [-p PROFILE] [-n] [MODULE...]
+  No args        install the 'standard' profile
+  -p PROFILE     install a profile (minimal / standard / full)
+  MODULE...      install specific modules (unioned with --profile)
+  -n, --dry-run  preview without changing anything
+EOF
+            return 0 ;;
+        -*) log_error "unknown option: $1"; return 1 ;;
+        *)  mods+=("$1"); shift ;;
+    esac; done
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
+    log_init install
+
+    local -a want=()
+    [[ -n "$profile" ]] && { load_profile "$profile" || return 1; want+=("${MODULES[@]}"); }
+    (( ${#mods[@]} )) && want+=("${mods[@]}")
+    (( ${#want[@]} )) || { load_profile standard || return 1; want=("${MODULES[@]}"); }
+
+    local m
+    for m in "${want[@]}"; do module_exists "$m" || { log_error "no such module: $m"; log_hint "see 'envup status'"; return 1; }; done
+
+    local -a order; mapfile -t order < <(resolve_order "${want[@]}")
+    log_info "install order: ${order[*]}"
+
+    # Install each selected module's declared SELF_DEPS that are missing, up
+    # front (so e.g. a fresh container has curl/git before an installer runs).
+    local -a deps=() d
+    for m in "${order[@]}"; do
+        for d in $(module_meta "$m" SELF_DEPS); do
+            [[ -n "$d" ]] || continue
+            have "$d" || deps+=("$d")
+        done
+    done
+    if (( ${#deps[@]} )); then
+        local -A s=(); local -a u=()
+        for d in "${deps[@]}"; do [[ -n "${s[$d]:-}" ]] || { s[$d]=1; u+=("$d"); }; done
+        log_info "installing prerequisites: ${u[*]}"
+        # Advisory, not fatal. These are conveniences the modules would like to
+        # have; the providers each check for what they actually need and pick a
+        # route accordingly. Aborting here is what used to make every profile
+        # uninstallable on a machine without root, even the modules that had a
+        # perfectly good user-space route.
+        pkg_install "${u[@]}" || log_warn "could not install prerequisites (${u[*]}) — modules will work around it"
+    fi
+
+    # Four states, because "failed" was hiding two very different things: a
+    # module that could not be installed *here* (no root, no package, nothing
+    # to download) still lands its config and is fine, while a module whose
+    # install actually broke is not.
+    # The manifest row is written by the engine itself (lib/engine.sh), which is
+    # the only place that knows which provider worked and what version landed.
+    local -a good=() degraded=() skipped=() fail=()
+    local rc
+    for m in "${order[@]}"; do
+        run_module_hook "$m" install; rc=$?
+        case "$(engine_state_label "$rc")" in
+            ok)       good+=("$m") ;;
+            degraded) degraded+=("$m") ;;
+            skipped)  skipped+=("$m") ;;
+            *)        fail+=("$m") ;;
+        esac
+    done
+    # Where the links were made from. doctor compares it against where envup is
+    # running from, and turns "twenty dangling symlinks" into "the repo moved".
+    [[ $dry == 1 ]] || manifest_set_root "$ENVUP_HOME"
+
+    echo
+    (( ${#good[@]} ))     && log_success "ok:       ${good[*]}"
+    (( ${#degraded[@]} )) && log_warn    "degraded: ${degraded[*]} (usable but incomplete — see above)"
+    (( ${#skipped[@]} ))  && log_info    "skipped:  ${skipped[*]} (not applicable to this machine)"
+    (( ${#fail[@]} ))     && log_error   "failed:   ${fail[*]}"
+    [[ -d "$ENVUP_BACKUP_DIR" ]] && log_info "backups: $ENVUP_BACKUP_DIR"
+
+    # Only a real failure is a failing exit status. 'degraded' is a correct,
+    # expected outcome on a locked-down server and scripts should not treat it
+    # as an error.
+    if (( ${#fail[@]} )); then log_hint "see log: $ENVUP_LOG_FILE"; return 1; fi
+    return 0
+}
+
+# ---- uninstall -----------------------------------------------------------
+cmd_uninstall() {
+    local all=0 dry=0; local -a mods=()
+    while (($#)); do case "$1" in
+        --all) all=1; shift ;;
+        -n|--dry-run) dry=1; shift ;;
+        -h|--help) echo "Usage: envup uninstall [--all] [-n] MODULE..."; return 0 ;;
+        -*) log_error "unknown option: $1"; return 1 ;;
+        *)  mods+=("$1"); shift ;;
+    esac; done
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
+    log_init uninstall
+
+    (( all == 1 )) && mapfile -t mods < <(manifest_list)
+    (( ${#mods[@]} )) || { log_error "no modules given (use --all or list names)"; return 1; }
+
+    # Uninstall only the requested set (deps are NOT pulled in — removing atuin
+    # must not remove zsh).
+    local m fail=()
+    for m in "${mods[@]}"; do
+        module_exists "$m" || { log_warn "no such module: $m"; continue; }
+        if run_module_hook "$m" uninstall; then [[ $dry == 1 ]] || manifest_remove "$m"
+        else fail+=("$m"); fi
+    done
+    echo
+    (( ${#fail[@]} )) && { log_error "hook failed for: ${fail[*]}"; return 1; }
+    log_success "uninstall complete"
+}
+
+# ---- upgrade -------------------------------------------------------------
+cmd_upgrade() {
+    local dry=0 keep=0 ref=""; local -a fwd=()
+    while (($#)); do case "$1" in
+        -n|--dry-run) dry=1; shift ;;
+        -k|--keep-going) keep=1; shift ;;
+        -r|--ref) ref="${2:-}"; [[ -n "$ref" ]] || { log_error "--ref needs a tag or branch"; return 1; }; shift 2 ;;
+        # The guard is not decoration: `shift 2` with one argument left fails
+        # *without shifting*, and `while (($#))` then spins forever.
+        -p|--profile) [[ -n "${2:-}" ]] || { log_error "--profile needs a name"; return 1; }
+                      fwd+=(--profile "$2"); shift 2 ;;
+        -h|--help) cat <<EOF
+Usage: envup upgrade [-n] [-k] [-r REF] [-p PROFILE] [MODULE...]
+  Update the source, then re-run install for everything in the manifest.
+  -r, --ref REF  check out a specific tag/branch (e.g. v0.1.0) instead of
+                 pulling the current branch — lets you pin/roll versions
+  -p PROFILE     also union a profile (picks up modules added to it)
+  -k             keep going even if the update step fails
+  -n             preview
+EOF
+            return 0 ;;
+        *) fwd+=("$1"); shift ;;
+    esac; done
+    log_init upgrade
+
+    # upgrade_source reports its own reason — see lib/upgrade.sh, which knows
+    # the failures this repo's design actually produces (a config edited
+    # through its symlink, a HEAD left detached by an earlier --ref).
+    [[ $dry == 1 ]] && export ENVUP_DRY_RUN=1
+    local ok=1
+    upgrade_source "$ref" || {
+        ok=0
+        [[ $keep == 1 ]] || { log_hint "use --keep-going to reinstall with the current source"; return 1; }
+    }
+
+    local -a inst=(); mapfile -t inst < <(manifest_list)
+    if (( ${#inst[@]} == 0 && ${#fwd[@]} == 0 )); then
+        log_info "nothing installed to upgrade"; return $(( 1 - ok ))
+    fi
+    [[ $dry == 1 ]] && fwd+=(--dry-run)
+
+    # fwd is empty for a plain `envup upgrade`, and bash before 4.4 treats
+    # expanding an empty array under `set -u` as an unbound variable. The
+    # ${a[@]+...} form is how the rest of the codebase says "expand to nothing".
+    cmd_install "${fwd[@]+"${fwd[@]}"}" "${inst[@]}"; local rc=$?
+    if (( ok == 0 )); then echo; log_error "REMINDER: the source was NOT updated — this reinstalled the OLD source"; return 1; fi
+    return $rc
+}
+
+# ---- status --------------------------------------------------------------
+# Minimal JSON string escaper (backslash + double-quote); our fields are simple.
+_json_escape() { local str="$1"; str="${str//\\/\\\\}"; str="${str//\"/\\\"}"; printf '%s' "$str"; }
+
+_status_json() {
+    local first=1 m p desc probe state tool inst n_unlinked n_dangling n_foreign
+    # net is whatever a previous command already probed: status is read-only and
+    # must not spend five seconds reaching for github to answer a local question.
+    printf '{"platform":"%s","arch":"%s","pkg":"%s","priv":"%s","net":"%s","modules":[' \
+        "$ENVUP_PLATFORM" "$ENVUP_ARCH" "$ENVUP_PKG" "$ENVUP_PRIV" "${ENVUP_NET:-unprobed}"
+    for m in $(modules_available); do
+        probe="$(health_probe "$m")"
+        state="$(health_field "$probe" state)"
+        tool="$(health_field "$probe" tool)"
+        read -r n_unlinked n_dangling n_foreign < <(health_link_counts "$probe")
+        # An uninstalled module has no link problems, it has no links at all.
+        # Reporting nine of them invites a consumer to "repair" nothing.
+        [[ "$state" == absent ]] && { inst=false; n_unlinked=0; n_dangling=0; n_foreign=0; } || inst=true
+        desc="$(_json_escape "$(module_meta "$m" DESCRIPTION)")"
+        (( first )) || printf ','; first=0
+        printf '{"name":"%s","description":"%s","installed":%s,"state":"%s","tool":"%s","provider":"%s","version":"%s","link_issues":{"unlinked":%s,"dangling":%s,"foreign":%s}}' \
+            "$m" "$desc" "$inst" "$state" "$tool" \
+            "$(_json_escape "$(manifest_get "$m" provider)")" \
+            "$(_json_escape "$(manifest_get "$m" version)")" \
+            "${n_unlinked:-0}" "${n_dangling:-0}" "${n_foreign:-0}"
+    done
+    printf '],"profiles":['
+    first=1
+    for p in $(profiles_available); do (( first )) || printf ','; first=0; printf '"%s"' "$p"; done
+    printf ']}\n'
+}
+
+# Real state, not the manifest's memory of it. Deleting ~/.zshrc by hand used to
+# leave a green tick here for as long as the manifest line survived.
+cmd_status() {
+    case "${1:-}" in
+        -h|--help) echo "Usage: envup status [--json]"; return 0 ;;
+        --json)    _status_json; return 0 ;;
+        "")        ;;
+        # Silently ignoring `--jsonn` and printing the human table is the worst
+        # possible answer for a script that asked for JSON.
+        *)         log_error "unknown option: $1"; echo "Usage: envup status [--json]" >&2; return 1 ;;
+    esac
+    log_info "Platform: $ENVUP_PLATFORM ($ENVUP_ARCH)  PkgMgr: $ENVUP_PKG  Priv: $ENVUP_PRIV"
+    echo; echo "Modules:"
+    local m probe state detail sym col unlinked=0
+    for m in $(modules_available); do
+        probe="$(health_probe "$m")"
+        state="$(health_field "$probe" state)"
+        detail=""
+        case "$state" in
+            ok)       sym="✓"; col="$C_GRN" ;;
+            degraded) sym="~"; col="$C_YEL"
+                      detail="$(printf '%s\n' "$probe" | awk -F'\t' '$1=="tool"{print $3; exit}')" ;;
+            broken)   sym="!"; col="$C_RED"
+                      detail="$(health_link_summary "$probe")"
+                      [[ "$detail" == *"not created yet"* ]] && unlinked=1 ;;
+            absent)   sym="○"; col="" ;;
+            *)        sym="?"; col="$C_RED"; detail="unreadable meta.sh" ;;
+        esac
+        printf '  %s%s%s %-8s %s%s%s%s\n' "$col" "$sym" "$C_NC" "$m" \
+            "$C_CYN" "$(module_meta "$m" DESCRIPTION)" "$C_NC" \
+            "${detail:+  — $detail}"
+    done
+    echo "  ✓ ok   ~ degraded (config linked, tool missing or unusable)   ! needs attention   ○ not installed"
+    # "not linked yet" is what you see after a git pull that added files to a
+    # module, and it is the one ! that means nothing is wrong — so say the
+    # command instead of leaving a red mark to worry about.
+    (( unlinked )) && log_hint "links the repo has grown since the last install: envup install <module> (or: envup doctor --fix)"
+    echo; echo "Profiles:"
+    local p; for p in $(profiles_available); do echo "  - $p"; done
+}
+
+# ---- clean ---------------------------------------------------------------
+cmd_clean() {
+    local dry=0 all=0 m; local -a tgt=()
+    while (($#)); do case "$1" in
+        -n|--dry-run) dry=1; shift ;;
+        --all) all=1; shift ;;
+        -h|--help) echo "Usage: envup clean [-n] [--all | MODULE...]"; return 0 ;;
+        --*) m="${1#--}"; module_exists "$m" || { log_error "unknown option: $1"; return 1; }
+             tgt+=("$m"); shift ;;
+        *)   if module_exists "$1"; then tgt+=("$1"); else log_error "no module: $1"; return 1; fi; shift ;;
+    esac; done
+    # --all used to be `tgt=()`, which cleared whatever had been parsed *before*
+    # it — so `clean nvim --all` and `clean --all nvim` did different things.
+    # Resolving after the loop makes the result independent of argument order.
+    if (( all )); then
+        (( ${#tgt[@]} )) && log_warn "--all overrides the module list (${tgt[*]})"
+        mapfile -t tgt < <(modules_available)
+    elif (( ${#tgt[@]} == 0 )); then
+        mapfile -t tgt < <(modules_available)
+    fi
+    log_init clean
+
+    local m p g n=0
+    for m in "${tgt[@]}"; do
+        local -a paths=() got=()
+        mapfile -t paths < <(module_meta "$m" CLEAN_PATHS)
+        for p in "${paths[@]}"; do [[ -n "$p" ]] || continue; for g in $p; do [[ -e "$g" ]] && got+=("$g"); done; done
+        (( ${#got[@]} )) || continue
+        log_step "[$m] cleaning caches"
+        if [[ $dry == 1 ]]; then for g in "${got[@]}"; do log_info "[dry-run] rm -rf $g"; done
+        else rm -rf "${got[@]}"; log_success "[$m] cleared ${#got[@]} path(s)"; fi
+        n=$((n + 1))
+    done
+    echo; (( n )) || log_info "nothing to clean"
+}
+
+# ---- log -----------------------------------------------------------------
+cmd_log() {
+    local follow=0
+    case "${1:-}" in
+        -f|--tail) follow=1 ;;
+        -h|--help) echo "Usage: envup log [--tail]"; return 0 ;;
+        "")        ;;
+        *)         log_error "unknown option: $1"; echo "Usage: envup log [--tail]" >&2; return 1 ;;
+    esac
+    local dir="$ENVUP_LOG_DIR"
+    # After shared-HOME state became host-scoped, keep old logs discoverable
+    # until this host has written its first new one. Reading logs must not itself
+    # create or migrate state.
+    if [[ ! -d "$dir" && -n "${ENVUP_LEGACY_STATE_DIR:-}" && -d "$ENVUP_LEGACY_STATE_DIR/logs" ]]; then
+        dir="$ENVUP_LEGACY_STATE_DIR/logs"
+    fi
+    [[ -d "$dir" ]] || { log_info "no logs yet"; return 0; }
+    # ls -t is the pragmatic way to pick the newest log; names are our own
+    # timestamped files, so the non-alphanumeric caveat behind SC2012 doesn't apply.
+    local latest
+    # shellcheck disable=SC2012
+    latest=$(ls -1t "$dir" 2>/dev/null | head -1)
+    [[ -n "$latest" ]] || { log_info "no logs yet"; return 0; }
+    log_info "latest: $dir/$latest"
+    if [[ $follow == 1 ]]; then tail -f "$dir/$latest"; else cat "$dir/$latest"; fi
+}
+
+# ---- doctor / adopt ------------------------------------------------------
+# Both live in lib/ (doctor.sh, adopt.sh): they are the largest single body of
+# logic envup has, and this file stays a dispatcher.
+#
+# Both can change the machine — `doctor --fix` rebuilds links and drops
+# manifest orphans, `adopt` moves file content out of the repo — so both call
+# log_init, like every other command that does. They do it themselves, after
+# parsing, so that `--help` doesn't leave a log file behind.
+cmd_doctor() { doctor_main "$@"; }
+cmd_adopt()  { adopt_main  "$@"; }
+cmd_clangd() { clangd_main "$@"; }
+
+# ---- dispatch ------------------------------------------------------------
+usage() {
+    cat <<EOF
+envup — your dev environment on any machine
+
+Usage: envup <command> [options]
+  install    [-p PROFILE] [-n] [MODULE...]   Install profile / modules
+  uninstall  [--all] [-n] MODULE...          Remove module symlinks
+  upgrade    [-n] [-k] [-p PROFILE]          git pull + reinstall
+  status     [--json]                        Show the real state of each module
+  doctor     [--fix] [--authoring]           Health-check this machine
+  adopt      [-n] [PATH...]                  Move third-party edits out of the repo
+  clean      [--all | MODULE...]             Clear caches declared in meta.sh
+  clangd     <sync|status|clean>              Bridge Docker builds to host Nvim
+  log        [--tail]                        Show the latest command log
+  version    (--version, -V)                 Print the envup version
+
+Run 'envup <command> --help' for command options.
+EOF
+}
+
+case "${1:-}" in
+    install)        shift; cmd_install   "$@" ;;
+    uninstall)      shift; cmd_uninstall "$@" ;;
+    upgrade)        shift; cmd_upgrade   "$@" ;;
+    status)         shift; cmd_status    "$@" ;;
+    clean)          shift; cmd_clean     "$@" ;;
+    clangd)         shift; cmd_clangd    "$@" ;;
+    log)            shift; cmd_log       "$@" ;;
+    doctor)         shift; cmd_doctor    "$@" ;;
+    adopt)          shift; cmd_adopt     "$@" ;;
+    version|--version|-V) echo "envup $(envup_version)" ;;
+    ""|-h|--help|help) usage ;;
+    *) log_error "unknown command: $1"; usage; exit 1 ;;
+esac

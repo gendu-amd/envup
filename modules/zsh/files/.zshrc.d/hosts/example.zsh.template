@@ -1,0 +1,28 @@
+# ============================================
+# hosts/<short-hostname>.zsh — config for one machine, committed to git
+# ============================================
+# Copy this to hosts/$(hostname -s).zsh, edit, commit. It loads in slice 70,
+# after every tool has been set up and before your personal ~/.zshrc.local.
+#
+# Use path_prepend / path_append (slice 10) rather than `export PATH=...`:
+# they skip directories that do not exist and they are idempotent, so nested
+# shells and tmux panes do not accumulate duplicates.
+
+# --- this box is deliberately on local time / on UTC ---
+# export TZ=Asia/Shanghai
+
+# --- corporate proxy ---
+# export http_proxy=http://proxy.corp:8080
+# export https_proxy=$http_proxy
+# export no_proxy=localhost,127.0.0.1,.corp
+
+# --- toolchains this machine has and others do not ---
+# path_prepend /opt/cuda/bin /opt/conda/bin
+# envvar_path_append LD_LIBRARY_PATH /opt/cuda/lib64
+
+# --- HPC module system ---
+# [[ -r /etc/profile.d/modules.sh ]] && source /etc/profile.d/modules.sh
+# module load gcc/13 2>/dev/null
+
+# --- machine-specific shortcuts ---
+# alias deploy='ssh deploy@prod-1'
