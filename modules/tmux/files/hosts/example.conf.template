@@ -1,0 +1,30 @@
+# ============================================
+# hosts/<short-hostname>.conf — tmux config for one machine, committed to git
+# ============================================
+# Copy this to hosts/$(hostname -s).conf, edit, then:
+#
+#   envup install tmux        # links it to ~/.tmux/host.conf
+#   tmux source ~/.tmux.conf
+#
+# It is sourced after TPM, so it can override any plugin's defaults, and before
+# ~/.tmux.local, so genuinely private settings still win.
+
+# --- tell this machine apart at a glance -------------------------------------
+# The cheapest guard against running the right command on the wrong box: give
+# each machine its own status bar colour. Red for anything you can break.
+# set -g status-style 'bg=#5c1a1a fg=#e6dede'
+# set -g status-left  '#[fg=#ff8787,bold][#S] PROD '
+
+# --- where projects live here ------------------------------------------------
+# `prefix + f` (tmux-sessionizer) globs these. Setting it in the tmux server
+# environment is what makes the key binding see it — a binding runs under the
+# server's environment, which never sourced your .zshrc. Alternatively write the
+# same list to ~/.config/envup/project-dirs, one glob per line, and both the
+# binding and the `ts` command pick it up.
+# set-environment -g ENVUP_PROJECT_DIRS '~/work/*:~/scratch/*'
+
+# --- machine-specific bindings ----------------------------------------------
+# bind g new-window -n logs 'journalctl -f'
+
+# --- this box is on a slow link; give tmux more rope -------------------------
+# set -s escape-time 50
