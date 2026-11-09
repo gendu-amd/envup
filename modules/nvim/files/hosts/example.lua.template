@@ -1,0 +1,32 @@
+-- ============================================
+-- hosts/<short-hostname>.lua — nvim config for one machine, committed to git
+-- ============================================
+-- Copy this to hosts/<the output of `hostname -s`>.lua and edit. No install
+-- step: ~/.config/nvim is a symlink to this directory, so the file is live as
+-- soon as it exists. init.lua loads it last (before ~/.config/nvim/local.lua),
+-- inside a pcall — a mistake here shows as a startup message, not a broken nvim.
+
+-- --- toolchain that only this machine has -----------------------------------
+-- vim.env.PATH = "/opt/rocm/llvm/bin:" .. vim.env.PATH
+
+-- --- an LSP server installed here, or one configured differently ------------
+-- require("lspconfig").clangd.setup {
+--   cmd = { "clangd", "--compile-commands-dir=build", "--background-index" },
+-- }
+
+-- --- tell this machine apart at a glance ------------------------------------
+-- A different theme per machine is the cheapest guard against editing the right
+-- file on the wrong box. Themes come from base46; :Telescope themes lists them.
+-- require("base46").load_all_highlights()
+-- vim.g.nvchad_theme = "gruvbox"
+
+-- --- this box is slow / on NFS: turn off what costs the most -----------------
+-- vim.o.swapfile = false
+-- vim.o.undofile = false
+
+-- --- override the clipboard decision ----------------------------------------
+-- configs/clipboard.lua installs the OSC 52 provider only when this machine has
+-- no native clipboard tool. If that guess is wrong here — an X display you
+-- never actually look at, say — force it back by assigning vim.g.clipboard
+-- yourself; this file runs last, so it wins.
+-- vim.g.clipboard = nil   -- let nvim autodetect again

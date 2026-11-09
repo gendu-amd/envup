@@ -1,0 +1,352 @@
+#!/usr/bin/env bats
+# Portable tmux defaults and behavior-sensitive bindings.
+
+load '../test_helper'
+
+setup() { common_setup; }
+teardown() { common_teardown; }
+
+TMUX_CONF() { printf '%s' "$REPO_ROOT/modules/tmux/files/.tmux.conf"; }
+
+# The shell condition out of `if-shell '<this>' ...`, by the tool it probes.
+conf_condition() {
+    sed -n "/^if-shell '$1/s/^if-shell '\([^']*\)'.*/\1/p" "$(TMUX_CONF)"
+}
+
+# ---- default-terminal ----------------------------------------------------
+
+@test "the terminfo entry is probed, not assumed" {
+    local cond; cond="$(conf_condition infocmp)"
+    [ -n "$cond" ]
+}
+
+@test "an ncurses that knows tmux-256color gets tmux-256color" {
+    stub_bin infocmp <<'EOF'
+#!/bin/bash
+[[ "$1" == tmux-256color ]] && exit 0
+exit 1
+EOF
+    run sh -c "$(conf_condition infocmp)"
+    [ "$status" -eq 0 ]
+    grep -q "'set -g default-terminal \"tmux-256color\"'" "$(TMUX_CONF)"
+}
+
+@test "an ncurses that does not falls back to screen-256color" {
+    # ncurses added the tmux-256color entry in 6.0. CentOS 7 shipped 5.9, and
+    # naming an entry that is not installed costs you the arrow keys.
+    stub_bin infocmp <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+    run sh -c "$(conf_condition infocmp)"
+    [ "$status" -ne 0 ]
+    grep -q "'set -g default-terminal \"screen-256color\"'" "$(TMUX_CONF)"
+}
+
+@test "no infocmp at all is answered silently" {
+    # Slim images drop ncurses-bin. Without the redirect this is a
+    # 'command not found' printed over the first thing you see in tmux.
+    rm -f "$STUB_BIN/infocmp"
+    isolate_path
+    run sh -c "$(conf_condition infocmp)"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "true colour is enabled for whichever name won" {
+    # The override globs on *256col*, which is the one thing screen-256color and
+    # tmux-256color have in common. Narrowing it to either name would switch
+    # truecolor off on half the machines.
+    grep -q 'terminal-overrides ",\*256col\*:Tc"' "$(TMUX_CONF)"
+}
+
+@test "default-terminal is never set unconditionally" {
+    # A stray `set -g default-terminal` later in the file would win over the
+    # probe and undo all of the above.
+    ! grep -Eq '^[[:space:]]*set(-option)? .*default-terminal' "$(TMUX_CONF)"
+}
+
+# ---- default-shell -------------------------------------------------------
+
+# The shell command out of the `run-shell '<this>'` line that picks the shell.
+conf_shell_probe() {
+    sed -n "/^run-shell 'command -v zsh/s/^run-shell '\(.*\)'\$/\1/p" "$(TMUX_CONF)"
+}
+
+@test "the shell is probed, not assumed" {
+    local cmd; cmd="$(conf_shell_probe)"
+    [ -n "$cmd" ]
+}
+
+@test "a machine with zsh gets zsh, by absolute path" {
+    # tmux ignores a default-shell that is not a full path and quietly uses
+    # /bin/sh instead, so passing the bare name through would give every pane a
+    # posix shell on exactly the machines this line exists for.
+    mkdir -p "$TEST_TMP/zbin"
+    printf '#!/bin/sh\n' > "$TEST_TMP/zbin/zsh"; chmod +x "$TEST_TMP/zbin/zsh"
+    stub_bin tmux <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*"
+EOF
+    PATH="$TEST_TMP/zbin:$PATH" run sh -c "$(conf_shell_probe)"
+    [ "$status" -eq 0 ]
+    [ "$output" = "set -g default-shell $TEST_TMP/zbin/zsh" ]
+}
+
+@test "a machine without zsh is left alone" {
+    # Nothing set at all, so tmux keeps starting the login shell. Pointing the
+    # option at a zsh that is not there would leave the server unable to open a
+    # pane, which is a worse answer than bash.
+    stub_bin tmux <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*"
+EOF
+    isolate_path
+    run sh -c "$(conf_shell_probe)"
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "the shell option is never set unconditionally, and never as a command" {
+    # default-command is the one that looks like a synonym and is not: tmux runs
+    # it through `sh -c`, so setting it here would silently take away the login
+    # shell — no /etc/profile, no ~/.zprofile, no `module`, no conda.
+    ! grep -Eq '^[[:space:]]*set(-option)? .*default-(shell|command)' "$(TMUX_CONF)"
+}
+
+# ---- the rest of the file ------------------------------------------------
+
+@test "every way of opening somewhere to type starts in the current directory" {
+    # Splits have taken -c since they were written and `c` did not, so a new
+    # window opened from a session started by hand landed back in $HOME. One
+    # key out of three behaving differently is the kind of thing you stop
+    # noticing and start working around.
+    local k line
+    for k in '|' '-' 'c'; do
+        line="$(grep -F "bind $k " "$(TMUX_CONF)")"
+        [ -n "$line" ]
+        [[ "$line" == *'-c "#{pane_current_path}"'* ]]
+    done
+}
+
+@test "moving a window follows it to its new index" {
+    # swap-window's -d flag would keep focus on the old index, making the
+    # other window suddenly appear under you instead of following your task.
+    grep -Eq '^bind -r "<" swap-window -t -1$' "$(TMUX_CONF)"
+    grep -Eq '^bind -r ">" swap-window -t \+1$' "$(TMUX_CONF)"
+    ! grep -Eq '^bind .*swap-window .* -d( |$)' "$(TMUX_CONF)"
+}
+
+@test "the scrollback limit is not quietly lower than the plugin's" {
+    # tmux-sensible raises history-limit to 50000 — but only when it finds
+    # tmux's default of 2000 still in place. Any number here wins over it,
+    # including a smaller one, and the plugin then looks like it did nothing.
+    local n
+    n="$(sed -n 's/^set -g history-limit \([0-9]*\).*/\1/p' "$(TMUX_CONF)")"
+    [ -n "$n" ]
+    [ "$n" -ge 50000 ]
+}
+
+@test "copy mode has a discoverable Vim-style entry and return to input" {
+    grep -Eq '^bind v copy-mode' "$(TMUX_CONF)"
+    grep -Eq '^bind -T copy-mode-vi i +send -X cancel$' "$(TMUX_CONF)"
+}
+
+@test "the status bar makes copy mode visible" {
+    local line
+    line="$(grep '^set -g status-left ' "$(TMUX_CONF)")"
+    [[ "$line" == *'#[fg=#282c34,bg=#e06c75,bold]#{?pane_in_mode, COPY ,}#[default]'* ]]
+}
+
+@test "tmux 2.7 parses the copy indicator in the correct branch" {
+    command -v tmux >/dev/null 2>&1 || skip "tmux not installed"
+    local sock="envup-status-$$" format
+    format="$(sed -n "s/^set -g status-left '\(.*\)'$/\1/p" "$(TMUX_CONF)")"
+
+    run tmux -L "$sock" -f /dev/null new-session -d -s envup-status
+    if [ "$status" -ne 0 ]; then
+        skip "cannot start a tmux server here"
+    fi
+
+    run tmux -L "$sock" display-message -p "$format"
+    local normal_status="$status" normal_output="$output"
+
+    tmux -L "$sock" copy-mode -t envup-status:0.0
+    run tmux -L "$sock" display-message -p "$format"
+    local copy_status="$status" copy_output="$output"
+    tmux -L "$sock" kill-server 2>/dev/null || true
+
+    [ "$normal_status" -eq 0 ]
+    [[ "$normal_output" != *COPY* ]]
+    [[ "$normal_output" == *'[envup-status]'* ]]
+    [ "$copy_status" -eq 0 ]
+    [[ "$copy_output" == *COPY* ]]
+    [[ "$copy_output" == *'[envup-status]'* ]]
+}
+
+# ---- the clipboard ---------------------------------------------------------
+#
+# Copy is the one thing here that fails without saying anything: the text goes
+# into tmux's buffer either way, and whether it reaches the system clipboard
+# depends on a terminal setting on a machine this config never sees. So the
+# probe is run rather than read.
+
+# The shell command out of the multi-line `run-shell '<this>'` block that picks
+# the clipboard tool. Anchored on a line that is nothing but the opening quote
+# and a continuation, which the one-line run-shells above cannot match.
+conf_copy_probe() {
+    sed -n "/^run-shell '[[:space:]]*.\$/,/^    fi'\$/p" "$(TMUX_CONF)" |
+        sed "1s/^run-shell '//; \$s/'\$//"
+}
+
+# A tmux that echoes the command it was given, so a test can assert on what the
+# probe asked tmux to do.
+stub_tmux() {
+    stub_bin tmux <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*"
+EOF
+}
+
+@test "the clipboard tool is probed, not assumed" {
+    local cmd; cmd="$(conf_copy_probe)"
+    [ -n "$cmd" ]
+}
+
+@test "a machine with pbcopy pipes copies to it instead of out as OSC 52" {
+    # The bug this exists for: on a Mac running tmux locally, copy went out as
+    # an escape sequence that iTerm2 drops unless you have turned it on and
+    # Terminal.app drops always, while pbcopy sat unused on PATH.
+    stub_tmux
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"copy-pipe-and-cancel pbcopy"* ]]
+}
+
+@test "every key that copies is repointed, not just y" {
+    # The bug in the first version of this: Enter is bound by tmux itself to
+    # copy-selection-and-cancel, and only y was repointed at the native tool. So
+    # on a Mac the same selection reached the clipboard or silently did not,
+    # depending on which key you finished with — the original defect, by a key
+    # nobody thought to check.
+    local k out
+    stub_tmux
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    out="$(DISPLAY= sh -c "$(conf_copy_probe)")"
+    for k in y Enter C-c; do
+        # bound to the tool by the probe...
+        [[ "$out" == *"bind -T copy-mode-vi $k send -X copy-pipe-and-cancel pbcopy"* ]]
+        # ...and to the OSC 52 baseline in the file, for machines with no tool.
+        grep -Eq "^bind -T copy-mode-vi $k +send -X copy-selection-and-cancel\$" \
+            "$(TMUX_CONF)"
+    done
+}
+
+@test "a machine with no clipboard tool is left on the OSC 52 route" {
+    # A server you ssh to. Nothing to pipe into, so the static copy-selection
+    # binding above stands and set-clipboard carries the text to your terminal.
+    stub_tmux
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" != *copy-pipe* ]]
+    [[ "$output" == *'@envup-copy-cmd'* ]]
+}
+
+@test "xclip without a DISPLAY is not a clipboard" {
+    # Same rule as nvim's clipboard.lua: presence on PATH is not enough. Piping
+    # into xclip on a headless box copies nothing and prints an error into the
+    # pane.
+    stub_tmux
+    stub_bin xclip <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" != *copy-pipe* ]]
+    [[ "$output" != *xclip* ]]
+}
+
+@test "an X11 machine with a DISPLAY does get xclip, as one argument" {
+    # The command is multi-word, and tmux takes it as a single argv element.
+    # Unquoted it would arrive as three and the binding would be nonsense.
+    stub_tmux
+    stub_bin xclip <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY=:0 run sh -c "$(conf_copy_probe)"
+    [[ "$output" == *"copy-pipe-and-cancel xclip -selection clipboard"* ]]
+}
+
+@test "no copy command newer than the oldest tmux we support is used" {
+    # tmux validates the -X argument neither when the key is bound nor when the
+    # key is pressed: on 2.7 `send -X bogus-command` is accepted, does nothing,
+    # and says nothing. So a 3.x-only command here is not a failure anyone would
+    # ever see — it is just a key that stopped working. Checked by name.
+    ! grep -v '^#' "$(TMUX_CONF)" | grep -Eq 'send -X [a-z-]*(no-clear|stop-selection)'
+}
+
+# ---- the mouse -------------------------------------------------------------
+#
+# All three of these override a tmux default rather than adding anything, so
+# what they are worth is exactly the difference from that default. Written down
+# here because a later "cleanup" that drops them as redundant would restore the
+# defaults, and the defaults are the bug.
+
+@test "the wheel is left to tmux" {
+    # Binding WheelUpPane to `copy-mode` without -e was tried and reverted: it
+    # keeps your place in the scrollback when you overshoot, at the cost of a `q`
+    # after every casual scroll, and a pane stuck in copy mode reads as a hung
+    # program. The comment above this line in the config has the whole argument;
+    # this is here so the next attempt starts by reading it.
+    ! grep -q '^bind -T root Wheel' "$(TMUX_CONF)"
+}
+
+@test "letting go of a drag does not reach the clipboard" {
+    # The complaint this exists for: a trackpad click carries a pixel or two of
+    # movement, tmux counts that as a drag, and the default MouseDragEnd binding
+    # copied — so focusing a pane silently overwrote the clipboard.
+    grep -q '^unbind -T copy-mode-vi MouseDragEnd1Pane' "$(TMUX_CONF)"
+    ! grep -q 'MouseDragEnd1Pane.*copy-' "$(TMUX_CONF)"
+}
+
+@test "the clipboard probe does not put a drag binding back" {
+    # It runs after the unbind above, so anything it binds wins.
+    stub_tmux
+    stub_bin pbcopy <<'EOF'
+#!/bin/sh
+EOF
+    isolate_path
+    DISPLAY= run sh -c "$(conf_copy_probe)"
+    [[ "$output" != *MouseDragEnd* ]]
+}
+
+@test "double and triple click select, they do not copy" {
+    # tmux 3.x binds both to copy-pipe-and-cancel: the same clipboard clobbering
+    # as above, by a second route. (2.x does not bind them at all, so on 2.x
+    # these are new.)
+    local line
+    for line in DoubleClick1Pane TripleClick1Pane; do
+        grep -q "^bind -T copy-mode-vi $line" "$(TMUX_CONF)"
+        grep -q "^bind -T root $line" "$(TMUX_CONF)"
+    done
+    ! grep -Eq 'Click1Pane.*copy-(pipe|selection)' "$(TMUX_CONF)"
+}
+
+@test "a pane that wants the mouse itself still gets it" {
+    # nvim and less ask the terminal for mouse events. Every root binding here
+    # has to keep tmux's own mouse_any_flag test or it takes those events away,
+    # and the symptom is nvim's mouse silently dying inside tmux only.
+    local binds flags
+    binds="$(grep -c '^bind -T root ' "$(TMUX_CONF)")"
+    flags="$(grep -v '^#' "$(TMUX_CONF)" | grep -c 'mouse_any_flag')"
+    [ "$binds" -gt 0 ]
+    [ "$flags" -eq "$binds" ]
+}
